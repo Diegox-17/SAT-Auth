@@ -1,15 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
-const SignedXml = require('xml-crypto').SignedXml;
-const forge = require('node-forge');
-const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
-
-/**
- * Crea el sobre SOAP firmado para la autenticación en el SAT.
- * @param {string} cerBase64 - El contenido del archivo .cer en Base64.
- * @param {string} keyPem - El contenido del archivo .key en formato PEM.
- * @param {string} password - La contraseña de la FIEL.
- * @returns {string} El XML del sobre SOAP completo y firmado.
- */
 function createAuthSignature(cerBase64, keyPem, password) {
     // 1. Procesar certificados y llaves
     const { pureCertBase64 } = processCertificate(cerBase64);
@@ -43,31 +31,36 @@ function createAuthSignature(cerBase64, keyPem, password) {
     `;
 
     // 4. Firmar el XML
-    const sig = new SignedXml();
+    // ****** INICIO DE LA CORRECCIÓN ******
+    const sig = new SignedXml(null, {
+      idAttribute: 'u:Id', // Le decimos a la librería cómo se llaman los atributos de ID
+      implicitTransforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"]
+    });
+    // ****** FIN DE LA CORRECCIÓN ******
+
     sig.signingKey = privateKeyPem;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    
+    // Le decimos que la referencia es a un URI que coincide con el ID del timestamp
     sig.addReference(
-        `//*[@u:Id='${timestampId}']`, // XPath para seleccionar el Timestamp
-        ["http://www.w3.org/2001/10/xml-exc-c14n#"], // Transformación de canonización exclusiva
+        `#${timestampId}`,
+        ["http://www.w3.org/2001/10/xml-exc-c14n#"],
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
     
-    // Agregamos la información del certificado a la firma
     sig.keyInfoProvider = {
         getKeyInfo: () => {
-            return `<o:SecurityTokenReference><o:Reference ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3" URI="#${securityTokenId}"/></o:SecurityTokenReference>`;
+            return `<o:SecurityTokenReference xmlns:o="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><o:Reference ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3" URI="#${securityTokenId}"/></o:SecurityTokenReference>`;
         }
     };
 
     sig.computeSignature(xml, {
-        prefix: 'o', // Prefijo para los elementos de Security (o:Security, o:BinarySecurityToken)
+        prefix: 'o',
         location: {
-            reference: "//*[local-name()='Security']", // Dónde insertar la firma
+            reference: "//*[local-name()='Security']",
             action: 'append'
         }
     });
 
     return sig.getSignedXml();
 }
-
-module.exports = { createAuthSignature };
