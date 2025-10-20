@@ -24,4 +24,48 @@ async function sendSoapRequest(url, action, xml) {
     }
 }
 
-module.exports = { sendSoapRequest };
+// NUEVA FUNCIÓN para peticiones que requieren el token
+async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
+    if (!authToken) {
+        // Devolvemos un error estructurado si no hay token
+        return { 
+            success: false, 
+            error: { 
+                statusCode: 401, 
+                message: 'Se requiere un token de autenticación para esta operación.' 
+            }
+        };
+    }
+    
+    try {
+        const headers = {
+            'Content-Type': 'text/xml;charset=UTF-8',
+            'SOAPAction': soapAction,
+            'Authorization': `WRAP access_token="${authToken}"` // Header de autorización
+        };
+
+        const { data } = await axios.post(url, xml, { headers });
+
+        const parsedData = await parseStringPromise(data, {
+            explicitArray: false,
+            tagNameProcessors: [tag => tag.replace('s:', '').replace('des:', '')]
+        });
+
+        // Extraer el resultado directamente
+        const result = parsedData.Envelope.Body.SolicitaDescargaResult;
+
+        return { success: true, data: result };
+
+    } catch (error) {
+        console.error('SOAP Client Authenticated Error:', error.response ? error.response.data : error.message);
+        return { 
+            success: false, 
+            error: { 
+                statusCode: error.response ? error.response.status : 500,
+                message: error.response ? error.response.data : 'Error en la comunicación con el servicio del SAT.'
+            }
+        };
+    }
+}
+
+module.exports = { sendSoapRequest,sendAuthenticatedRequest };
