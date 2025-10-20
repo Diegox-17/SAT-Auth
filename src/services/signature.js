@@ -30,7 +30,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
                 </o:Security>
             </s:Header>
             <s:Body>
-                <Autentica xmlns="http://DescargaMasivaTerceros.gob.mx/"/>
+                <Autentica xmlns="http://DescargaMasivaTerceros.gob.mx"/>
             </s:Body>
         </s:Envelope>
     `;
