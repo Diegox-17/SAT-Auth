@@ -7,8 +7,9 @@ services:
     container_name: sat-auth-service
     restart: unless-stopped
     networks:
-      - nginx-proxy-manager_default # <-- ¡IMPORTANTE! Usa el nombre de tu red aquí.
+      - proxy-net
 
 networks:
-  nginx-proxy-manager_default: # <-- ¡IMPORTANTE! Y también aquí.
+ proxy-net:
     external: true
+
