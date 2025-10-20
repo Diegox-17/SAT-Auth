@@ -67,77 +67,68 @@ function createAuthSignature(cerBase64, keyPem, password) {
 }
 
 //Función de descargas:
-/**
- * Genera el XML firmado para las solicitudes de descarga de CFDI.
- * @param {object} fiel - Objeto con credenciales de la FIEL.
- * @param {object} requestData - Parámetros para la solicitud (fechas, RFCs, etc.).
- * @param {string} type - 'issued' o 'received'.
- * @returns {string} El sobre SOAP completo y firmado.
- */
 async function generateDownloadSignature(fiel, requestData, type) {
+    if (!fiel || !fiel.cerBase64 || !fiel.keyPem || !fiel.password) {
+        throw new Error("El objeto 'fiel' y sus propiedades son requeridos.");
+    }
+    
     const { cerBase64, keyPem, password } = fiel;
     const { certificate, issuerData } = getCertificateInfo(cerBase64);
-
-    // Obtener la llave privada
     const privateKey = forge.pki.decryptRsaPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
-    // Determinar el tipo de solicitud y sus parámetros
-    const serviceNode = type === 'issued' ? 'des:SolicitaDescargaEmitidos' : 'des:SolicitaDescargaRecibidos';
-    const rfcNode = type === 'issued' 
-        ? `<des:RfcReceptores>${requestData.rfcReceptores.map(r => `<des:RfcReceptor>${r}</des:RfcReceptor>`).join('')}</des:RfcReceptores>`
-        : ''; // Para recibidos, el RFC emisor es un atributo.
+    const serviceNode = `des:SolicitaDescarga${type}`;
+    const requestId = `id-${forge.util.bytesToHex(forge.random.getBytesSync(20))}`;
 
-    // CRÍTICO: Ordenar los atributos de la solicitud alfabéticamente
+    // CRÍTICO: Ordenar atributos alfabéticamente
     const sortedAttributes = Object.keys(requestData)
-        .filter(key => typeof requestData[key] === 'string') // Solo atributos simples
         .sort()
         .map(key => `${key}="${requestData[key]}"`)
         .join(' ');
-        
-    const requestId = `id-${forge.util.bytesToHex(forge.random.getBytesSync(20))}`;
+    
+    // El nodo <des:solicitud> con sus atributos ordenados
+    const solicitudNode = `<des:solicitud Id="${requestId}" ${sortedAttributes}></des:solicitud>`;
 
-    const soapBodyContent = `
-        <${serviceNode}>
-            <des:solicitud ${sortedAttributes} Id="${requestId}">
-                ${rfcNode}
-            </des:solicitud>
-        </${serviceNode}>
-    `;
-
-    // XML completo sin firma para ser procesado
+    // Construir el XML base que será firmado
     const unsignedXml = `
-        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
             <s:Header/>
             <s:Body>
-                ${soapBodyContent}
+                <${serviceNode}>
+                    ${solicitudNode}
+                </${serviceNode}>
             </s:Body>
         </s:Envelope>
-    `;
+    `.trim();
 
-    // Lógica de firma
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
-    sig.signatureAlgorithm = 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
-    sig.addReference(
-        `#${requestId}`, // Referencia al ID de la solicitud
-        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
-        'http://www.w3.org/2000/09/xmldsig#sha1'
-    );
-    
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     sig.keyInfoProvider = {
-        getKeyInfo: () => `<X509Data>
-                            <X509IssuerSerial>
-                                <X509IssuerName>${issuerData}</X509IssuerName>
-                                <X509SerialNumber>${certificate.serialNumber}</X509SerialNumber>
-                            </X509IssuerSerial>
-                            <X509Certificate>${cerBase64}</X509Certificate>
-                        </X509Data>`
+        getKeyInfo: () => `<xd:X509Data>
+                               <xd:X509IssuerSerial>
+                                   <xd:X509IssuerName>${issuerData}</xd:X509IssuerName>
+                                   <xd:X509SerialNumber>${certificate.serialNumber}</xd:X509SerialNumber>
+                               </xd:X509IssuerSerial>
+                               <xd:X509Certificate>${cerBase64}</xd:X509Certificate>
+                           </xd:X509Data>`
     };
 
+    sig.addReference(
+        `#${requestId}`, // Referencia al ID del nodo <des:solicitud>
+        [
+            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+            "http://www.w3.org/2001/10/xml-exc-c14n#"
+        ],
+        "http://www.w3.org/2000/09/xmldsig#sha1"
+    );
+
+    // Ubicación donde se insertará la firma
     sig.computeSignature(unsignedXml, {
-        prefix: 'xd',
-        location: { reference: `//*[local-name(.)='solicitud']`, action: 'append' }
+        location: {
+            reference: `//*[local-name(.)='solicitud']`,
+            action: 'append'
+        }
     });
 
     return sig.getSignedXml();
