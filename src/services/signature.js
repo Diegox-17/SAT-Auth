@@ -1,3 +1,8 @@
+const { v4: uuidv4 } = require('uuid');
+const SignedXml = require('xml-crypto').SignedXml;
+const forge = require('node-forge');
+const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
+
 function createAuthSignature(cerBase64, keyPem, password) {
     console.log('[SIGNATURE] Iniciando creación de firma de autenticación...');
 
