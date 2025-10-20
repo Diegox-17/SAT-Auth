@@ -1,15 +1,11 @@
-version: "3.8"
-
+version: '3.8'
 services:
-  sat-auth-service:
-    image: sat-auth-service:latest
+  sat-auth:
     build: .
     container_name: sat-auth-service
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/usr/src/app/src
+      - ./public:/usr/src/app/public
     restart: unless-stopped
-    networks:
-      - proxy-net
-
-networks:
- proxy-net:
-    external: true
-
