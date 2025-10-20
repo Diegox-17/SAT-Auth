@@ -1,4 +1,10 @@
 version: '3.8'
+
+# DECLARAMOS LA RED EXTERNA A LA QUE NOS VAMOS A CONECTAR
+networks:
+  proxy-net:
+    external: true # LE DECIMOS A COMPOSE QUE ESTA RED YA EXISTE, NO DEBE CREARLA
+
 services:
   sat-auth:
     build: .
@@ -6,3 +12,7 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+        # CONECTAMOS NUESTRO SERVICIO A ESA RED EXTERNA
+    networks:
+      - proxy-net
+      # Por defecto, también se conectará a 'sat_auth_default', lo cual está bien.
