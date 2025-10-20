@@ -1,8 +1,28 @@
+const { v4: uuidv4 } = require('uuid');
+const SignedXml = require('xml-crypto').SignedXml;
+const forge = require('node-forge');
+// ****** INICIO DE LA CORRECCIÓN ******
+// Esta línea es la que faltaba y causaba el error '... is not defined'.
+const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
+// ****** FIN DE LA CORRECCIÓN ******
+
+/**
+ * Crea el sobre SOAP firmado para la autenticación en el SAT.
+ * @param {string} cerBase64 - El contenido del archivo .cer en Base64.
+ * @param {string} keyPem - El contenido del archivo .key en formato PEM.
+ * @param {string} password - La contraseña de la FIEL.
+ * @returns {string} El XML del sobre SOAP completo y firmado.
+ */
 function createAuthSignature(cerBase64, keyPem, password) {
+    console.log('[SIGNATURE] Iniciando creación de firma de autenticación...');
+
     // 1. Procesar certificados y llaves
+    console.log('[SIGNATURE] Procesando certificado...');
     const { pureCertBase64 } = processCertificate(cerBase64);
+    console.log('[SIGNATURE] Certificado procesado. Desencriptando llave privada...');
     const privateKey = decryptPrivateKey(keyPem, password);
     const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
+    console.log('[SIGNATURE] Llave privada lista.');
 
     // 2. Generar Timestamps y UUIDs
     const now = new Date();
@@ -11,6 +31,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
     const expiresString = expires.toISOString().substring(0, 19) + 'Z';
     const timestampId = `_0`;
     const securityTokenId = `uuid-${uuidv4()}-1`;
+    console.log(`[SIGNATURE] Timestamp creado: ${createdString} -> ${expiresString}`);
 
     // 3. Construir el XML base (sin firmar)
     const xml = `
@@ -29,19 +50,18 @@ function createAuthSignature(cerBase64, keyPem, password) {
             </s:Body>
         </s:Envelope>
     `;
+    console.log('[SIGNATURE] Plantilla XML generada.');
 
     // 4. Firmar el XML
-    // ****** INICIO DE LA CORRECCIÓN ******
+    console.log('[SIGNATURE] Firmando XML...');
     const sig = new SignedXml(null, {
-      idAttribute: 'u:Id', // Le decimos a la librería cómo se llaman los atributos de ID
+      idAttribute: 'u:Id',
       implicitTransforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"]
     });
-    // ****** FIN DE LA CORRECCIÓN ******
 
     sig.signingKey = privateKeyPem;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
-    // Le decimos que la referencia es a un URI que coincide con el ID del timestamp
     sig.addReference(
         `#${timestampId}`,
         ["http://www.w3.org/2001/10/xml-exc-c14n#"],
@@ -62,6 +82,10 @@ function createAuthSignature(cerBase64, keyPem, password) {
         }
     });
 
-    return sig.getSignedXml();
+    const signedXml = sig.getSignedXml();
+    console.log('[SIGNATURE] Firma completada. XML firmado listo.');
+    return signedXml;
 }
+
+// Asegurémonos de que la exportación es correcta
 module.exports = { createAuthSignature };
