@@ -29,7 +29,8 @@ Este microservicio encapsula la complejidad de la comunicación con los servicio
   ```
 
 ---
-*Más endpoints serán documentados aquí a medida que se implementen.*
+
+_Más endpoints serán documentados aquí a medida que se implementen._
 
 ## Ejecución Local
 
