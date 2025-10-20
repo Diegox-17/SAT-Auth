@@ -4,23 +4,11 @@ const forge = require('node-forge');
 const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
 
 function createAuthSignature(cerBase64, keyPem, password) {
-    console.log('[SIGNATURE] v5.1 - Ejecutando función createAuthSignature.');
+    console.log('[SIGNATURE] v6.0 - Ejecutando para xml-crypto@3.3.0');
 
-    let pureCertBase64, privateKey, privateKeyPem;
-    try {
-        console.log('[SIGNATURE]   - Paso 1.1: Procesando certificado...');
-        const certData = processCertificate(cerBase64);
-        pureCertBase64 = certData.pureCertBase64;
-        console.log('[SIGNATURE]   - Paso 1.1: ¡Éxito!');
-
-        console.log('[SIGNATURE]   - Paso 1.2: Desencriptando llave privada...');
-        privateKey = decryptPrivateKey(keyPem, password);
-        privateKeyPem = forge.pki.privateKeyToPem(privateKey);
-        console.log('[SIGNATURE]   - Paso 1.2: ¡Éxito!');
-    } catch (e) {
-        console.error('[SIGNATURE]   - ERROR en el procesamiento de credenciales:', e.message);
-        throw e;
-    }
+    const { pureCertBase64 } = processCertificate(cerBase64);
+    const privateKey = decryptPrivateKey(keyPem, password);
+    const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
 
     const now = new Date();
     const expires = new Date(now.getTime() + 5 * 60000);
@@ -28,7 +16,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
     const expiresString = expires.toISOString().substring(0, 19) + 'Z';
     const timestampId = `_0`;
     const securityTokenId = `uuid-${uuidv4()}-1`;
-    console.log(`[SIGNATURE]   - Paso 2: Timestamps generados: ${createdString} -> ${expiresString}`);
+    console.log(`[SIGNATURE] Timestamps: ${createdString} -> ${expiresString}`);
 
     const xml = `
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:u="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd">
@@ -46,40 +34,24 @@ function createAuthSignature(cerBase64, keyPem, password) {
             </s:Body>
         </s:Envelope>
     `;
-    console.log('[SIGNATURE]   - Paso 3: Plantilla XML generada.');
 
-    try {
-        console.log('[SIGNATURE]   - Paso 4: Iniciando firma con xml-crypto...');
-        const sig = new SignedXml();
-        sig.signingKey = privateKeyPem;
-        sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    console.log('[SIGNATURE] Firmando XML...');
+    const sig = new SignedXml();
+    sig.signingKey = privateKeyPem;
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    sig.keyInfoProvider = {
+        getKeyInfo: () => `<o:SecurityTokenReference><o:Reference ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3" URI="#${securityTokenId}"/></o:SecurityTokenReference>`
+    };
 
-        const transforms = ["http://www.w3.org/2001/10/xml-exc-c14n#"];
-        const digestAlgorithm = "http://www.w3.org/2000/09/xmldsig#sha1";
-        
-        // La referencia más explícita posible
-        const xpath = "//*[local-name(.)='Timestamp' and namespace-uri(.)='http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd']";
-        sig.addReference(xpath, transforms, digestAlgorithm);
+    const xpath = "//*[local-name(.)='Timestamp']";
+    const transforms = ["http://www.w3.org/2001/10/xml-exc-c14n#"];
+    const digestAlgorithm = "http://www.w3.org/2000/09/xmldsig#sha1";
 
-        sig.keyInfoProvider = {
-            getKeyInfo: (key, prefix) => {
-                return `<${prefix}:SecurityTokenReference><${prefix}:Reference URI="#${securityTokenId}" ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3"/></${prefix}:SecurityTokenReference>`;
-            }
-        };
-
-        console.log('[SIGNATURE]   - Paso 4.1: Calculando firma...');
-        sig.computeSignature(xml, {
-            prefix: 'o',
-            location: { reference: "//*[local-name(.)='Security']", action: 'append' }
-        });
-        
-        const signedXml = sig.getSignedXml();
-        console.log('[SIGNATURE]   - Paso 4.2: ¡Éxito! Firma calculada.');
-        return signedXml;
-    } catch (e) {
-        console.error('[SIGNATURE]   - ERROR en el proceso de firma de xml-crypto:', e);
-        throw e;
-    }
+    sig.addReference(xpath, transforms, digestAlgorithm, `#${timestampId}`);
+    sig.computeSignature(xml, { prefix: 'o', location: { reference: "//*[local-name()='Security']", action: 'append' } });
+    
+    console.log('[SIGNATURE] Firma completada.');
+    return sig.getSignedXml();
 }
 
 module.exports = { createAuthSignature };
