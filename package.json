@@ -2,7 +2,6 @@
   "name": "sat-auth-service",
   "version": "1.0.0",
   "description": "Microservicio para la autenticación y descarga masiva de CFDI del SAT.",
-  "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js"
   },
