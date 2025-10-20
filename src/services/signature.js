@@ -5,7 +5,6 @@ const forge = require('node-forge');
 const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
 
 //Constantes para función de descargas:
-const { SignedXml } = require('xml-crypto');
 const { getCertificateInfo } = require('../utils/crypto');
 
 //Función de autenticación
