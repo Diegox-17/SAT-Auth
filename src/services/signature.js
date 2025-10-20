@@ -1,3 +1,4 @@
+// ... (los require al principio se mantienen igual)
 const { v4: uuidv4 } = require('uuid');
 const SignedXml = require('xml-crypto').SignedXml;
 const forge = require('node-forge');
@@ -6,13 +7,10 @@ const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
 function createAuthSignature(cerBase64, keyPem, password) {
     console.log('[SIGNATURE] Iniciando creación de firma de autenticación...');
 
-    console.log('[SIGNATURE] Procesando certificado...');
+    // ... (toda la lógica de certificados y timestamps se mantiene igual)
     const { pureCertBase64 } = processCertificate(cerBase64);
-    console.log('[SIGNATURE] Certificado procesado. Desencriptando llave privada...');
     const privateKey = decryptPrivateKey(keyPem, password);
     const privateKeyPem = forge.pki.privateKeyToPem(privateKey);
-    console.log('[SIGNATURE] Llave privada lista.');
-
     const now = new Date();
     const expires = new Date(now.getTime() + 5 * 60000);
     const createdString = now.toISOString().substring(0, 19) + 'Z';
@@ -25,26 +23,29 @@ function createAuthSignature(cerBase64, keyPem, password) {
 
     console.log('[SIGNATURE] Firmando XML...');
     
-    // ****** INICIO DE LA PRUEBA DE TINTA ******
-    console.log('[SIGNATURE-V4] Usando constructor de SignedXml con objeto de configuración.');
+    // El constructor se mantiene corregido
     const sig = new SignedXml({
       idAttribute: 'u:Id',
       implicitTransforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"]
     });
-    // ****** FIN DE LA PRUEBA DE TINTA ******
 
     sig.signingKey = privateKeyPem;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
+    // ****** INICIO DE LA CORRECCIÓN FINAL ******
+    // En lugar de referenciar el ID, usamos un XPath que ignora los namespaces.
+    // Esto busca cualquier elemento llamado 'Timestamp' en todo el documento.
+    const xpath = "//*[local-name(.)='Timestamp']";
     sig.addReference(
-        `#${timestampId}`,
+        xpath,
         ["http://www.w3.org/2001/10/xml-exc-c14n#"],
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
+    // ****** FIN DE LA CORRECCIÓN FINAL ******
     
-    sig.keyInfoProvider = { /* ... */ };
+    sig.keyInfoProvider = { /* ... sin cambios ... */ };
 
-    sig.computeSignature(xml, { /* ... */ });
+    sig.computeSignature(xml, { /* ... sin cambios ... */ });
 
     const signedXml = sig.getSignedXml();
     console.log('[SIGNATURE] Firma completada. XML firmado listo.');
