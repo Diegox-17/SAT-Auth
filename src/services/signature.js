@@ -64,3 +64,4 @@ function createAuthSignature(cerBase64, keyPem, password) {
 
     return sig.getSignedXml();
 }
+module.exports = { createAuthSignature };
