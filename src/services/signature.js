@@ -68,6 +68,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
 
 //Función de descargas:
 async function generateDownloadSignature(fiel, requestData, type) {
+    console.log(`[Signature Service] Iniciando generación de firma para descarga de tipo: ${type}`);
     if (!fiel || !fiel.cerBase64 || !fiel.keyPem || !fiel.password) {
         throw new Error("El objeto 'fiel' y sus propiedades son requeridos.");
     }
@@ -85,6 +86,7 @@ async function generateDownloadSignature(fiel, requestData, type) {
         .sort()
         .map(key => `${key}="${requestData[key]}"`)
         .join(' ');
+    console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):', sortedAttributes);
     
     // El nodo <des:solicitud> con sus atributos ordenados
     const solicitudNode = `<des:solicitud Id="${requestId}" ${sortedAttributes}></des:solicitud>`;
@@ -131,7 +133,12 @@ async function generateDownloadSignature(fiel, requestData, type) {
         }
     });
 
-    return sig.getSignedXml();
+    const finalXml = sig.getSignedXml();
+    console.log('[Signature Service] Firma generada exitosamente. XML listo para enviar.');
+    // Descomenta la siguiente línea si quieres ver el XML completo en los logs (puede ser muy largo)
+    // console.log(finalXml);
+    
+    return finalXml;
 }
 
 module.exports = { createAuthSignature,generateDownloadSignature };
