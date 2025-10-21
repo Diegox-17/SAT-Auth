@@ -6,7 +6,7 @@ const axios = require('axios');
 const { parseStringPromise } = require('xml2js');
 
 // Función original para la autenticación (sin token)
-async function sendRequest(url, xml, soapAction) {
+async function sendSoapRequest(url, xml, soapAction) {
     try {
         const headers = {
             'Content-Type': 'text/xml;charset=UTF-8',
@@ -63,6 +63,6 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
 }
 
 module.exports = { 
-    sendRequest,
+    sendSoapRequest,
     sendAuthenticatedRequest
 };
