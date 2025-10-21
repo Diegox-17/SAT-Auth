@@ -55,6 +55,8 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
         // Extraer el resultado directamente
         const result = parsedData.Envelope.Body.SolicitaDescargaResult;
 
+        console.log('[SOAP Client] Objeto de respuesta extraído del SAT:', JSON.stringify(result, null, 2));
+
         return { success: true, data: result };
 
     } catch (error) {
