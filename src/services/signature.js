@@ -104,6 +104,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
             </s:Body>
         </s:Envelope>
     `.trim();
+    //añadido por el usuario
+    console.log('[Signature Service] se generó el sunsignedXml:', unsignedXml);
 
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
