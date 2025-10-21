@@ -54,13 +54,19 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
 
         //console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
         //console.log(JSON.stringify(parsedData, null, 2));
-
-        // --- LA RUTA CORRECTA Y FINAL ---
-        // Basada en la respuesta real que recibimos del SAT.
-        const result = parsedData.Envelope.Body;
+        if (!parsedData.Envelope || !parsedData.Envelope.Body) {
+            // Si no tiene la estructura, es una respuesta inesperada (probablemente un Fault)
+            console.error('[SOAP Client] Respuesta inesperada del SAT:', JSON.stringify(parsedData, null, 2));
+            const faultMessage = parsedData.Fault?.faultstring || 'La respuesta del SAT no es un sobre SOAP válido.';
+            return { success: false, error: { statusCode: 500, message: faultMessage }};
+        }
+        // --- FIN DE LA CORRECCIÓN ---
+        
+        const body = parsedData.Envelope.Body;
+        
         console.log('[SOAP Client] Cuerpo de la respuesta del SAT (parseado):', JSON.stringify(body, null, 2));
 
-        return { success: true, data: result };
+        return { success: true, data: body };
 
     } 
     
