@@ -144,4 +144,35 @@ async function generateDownloadSignature(fiel, requestData, type) {
     return finalXml;
 }
 
-module.exports = { createAuthSignature, generateDownloadSignature };
+async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
+    const { cerBase64, keyPem, password } = fiel;
+    const cleanCertificate = Buffer.from(cerBase64, 'base64').toString('utf-8')
+        .replace('-----BEGIN CERTIFICATE-----', '')
+        .replace('-----END CERTIFICATE-----', '')
+        .replace(/\s/g, '');
+    
+    // El XML base es muy similar al de la solicitud, solo cambia el nodo principal
+    const soapBody = `
+        <des:VerificaSolicitudDescarga xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+            <des:solicitud IdSolicitud="${idSolicitud}" RfcSolicitante="${rfcSolicitante}">
+            </des:solicitud>
+        </des:VerificaSolicitudDescarga>
+    `;
+    
+    // Firmamos el nodo <des:solicitud>
+    const signedXml = await signXml(soapBody, keyPem, password, cleanCertificate, 'des:solicitud');
+
+    const soapEnvelope = `
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+            <s:Header/>
+            <s:Body>
+                ${signedXml}
+            </s:Body>
+        </s:Envelope>
+    `;
+
+    return soapEnvelope;
+}
+
+
+module.exports = { createAuthSignature, generateDownloadSignature, signVerificationRequest };
