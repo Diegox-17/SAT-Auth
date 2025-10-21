@@ -128,7 +128,7 @@ async function generateDownloadSignature(fiel, requestData, type) {
         </s:Envelope>
     `.trim();
 
-    console.log('[Signature Service] XML con placeholder generado.:'xmlWithPlaceholder);
+    console.log('[Signature Service] XML con placeholder generado.:',xmlWithPlaceholder);
                 
     console.log('A punto de calcular la firma.');
 
