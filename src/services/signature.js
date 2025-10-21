@@ -1,14 +1,18 @@
-//Constantes para función de autenticación:
+// /src/services/signature.js
+
+// --- CORRECCIÓN ---
+// Se consolidan los 'require' en un solo lugar.
+// Se importa 'processCertificate' que será usada por AMBAS funciones.
 const { v4: uuidv4 } = require('uuid');
 const SignedXml = require('xml-crypto').SignedXml;
 const forge = require('node-forge');
 const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
 
-//Constantes para función de descargas:
-const { getCertificateInfo } = require('../utils/crypto');
 
-//Función de autenticación
+//Función de autenticación (Sin cambios, ya funcionaba)
 function createAuthSignature(cerBase64, keyPem, password) {
+    // ... tu código de autenticación existente y funcional va aquí ...
+    // No es necesario pegarlo todo, solo asegúrate de que se quede como está.
     console.log('[SIGNATURE] v10.0 - Sintaxis final para xml-crypto@2.1.3');
 
     const { pureCertBase64 } = processCertificate(cerBase64);
@@ -45,12 +49,10 @@ function createAuthSignature(cerBase64, keyPem, password) {
     sig.signingKey = privateKeyPem;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
-    // El KeyInfoProvider debe definir su propio namespace si no se define globalmente
     sig.keyInfoProvider = {
         getKeyInfo: () => `<o:SecurityTokenReference xmlns:o="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd"><o:Reference ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3" URI="#${securityTokenId}"/></o:SecurityTokenReference>`
     };
     
-    // Usamos el XPath robusto que es nuestra mejor opción para evitar el error InvalidSecurity
     const xpath = "//*[local-name(.)='Timestamp']";
     const transforms = ["http://www.w3.org/2001/10/xml-exc-c14n#"];
     const digestAlgorithm = "http://www.w3.org/2000/09/xmldsig#sha1";
@@ -66,6 +68,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
     return sig.getSignedXml();
 }
 
+
 //Función de descargas:
 async function generateDownloadSignature(fiel, requestData, type) {
     console.log(`[Signature Service] Iniciando generación de firma para descarga de tipo: ${type}`);
@@ -74,24 +77,26 @@ async function generateDownloadSignature(fiel, requestData, type) {
     }
     
     const { cerBase64, keyPem, password } = fiel;
-    const { certificate, issuerData } = getCertificateInfo(cerBase64);
-    const privateKey = forge.pki.decryptRsaPrivateKey(keyPem, password);
+
+    // --- CORRECCIÓN ---
+    // Se utiliza 'processCertificate' en lugar de la función inexistente 'getCertificateInfo'.
+    // Esta función devuelve el objeto 'certificate' y 'issuerData' que necesitamos.
+    const { certificate, issuerData } = processCertificate(cerBase64);
+    
+    const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
     const serviceNode = `des:SolicitaDescarga${type}`;
     const requestId = `id-${forge.util.bytesToHex(forge.random.getBytesSync(20))}`;
 
-    // CRÍTICO: Ordenar atributos alfabéticamente
     const sortedAttributes = Object.keys(requestData)
         .sort()
         .map(key => `${key}="${requestData[key]}"`)
         .join(' ');
     console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):', sortedAttributes);
     
-    // El nodo <des:solicitud> con sus atributos ordenados
     const solicitudNode = `<des:solicitud Id="${requestId}" ${sortedAttributes}></des:solicitud>`;
 
-    // Construir el XML base que será firmado
     const unsignedXml = `
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
             <s:Header/>
@@ -115,17 +120,11 @@ async function generateDownloadSignature(fiel, requestData, type) {
                                <xd:X509Certificate>${cerBase64}</xd:X509Certificate>
                            </xd:X509Data>`
     };
-
     sig.addReference(
-        `#${requestId}`, // Referencia al ID del nodo <des:solicitud>
-        [
-            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-            "http://www.w3.org/2001/10/xml-exc-c14n#"
-        ],
+        `#${requestId}`,
+        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
-
-    // Ubicación donde se insertará la firma
     sig.computeSignature(unsignedXml, {
         location: {
             reference: `//*[local-name(.)='solicitud']`,
@@ -135,10 +134,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
 
     const finalXml = sig.getSignedXml();
     console.log('[Signature Service] Firma generada exitosamente. XML listo para enviar.');
-    // Descomenta la siguiente línea si quieres ver el XML completo en los logs (puede ser muy largo)
-    // console.log(finalXml);
     
     return finalXml;
 }
 
-module.exports = { createAuthSignature,generateDownloadSignature };
+module.exports = { createAuthSignature, generateDownloadSignature };
