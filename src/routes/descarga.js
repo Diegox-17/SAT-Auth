@@ -15,7 +15,7 @@ const handleDownloadRequest = async (req, res, tipo) => {
     }
 
     try {
-        const signedXml = await generateDownloadSignature(fiel, requestData);
+        const signedXml = await generateDownloadSignature(fiel, requestData, tipo);
 
         console.log('--- XML FINAL A PUNTO DE SER ENVIADO AL SAT ---');
         console.log(signedXml);
@@ -58,5 +58,6 @@ router.post('/recibidos', (req, res) => handleDownloadRequest(req, res, 'Recibid
 router.post('/emitidos', (req, res) => handleDownloadRequest(req, res, 'Emitidos'));
 
 module.exports = router;
+
 
 
