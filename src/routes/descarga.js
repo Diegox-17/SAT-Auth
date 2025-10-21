@@ -1,7 +1,7 @@
 // src/routes/descarga.js
 
 const express = require('express');
-const { signDownloadRequest } = require('../services/signature');
+const { generateDownloadSignature } = require('../services/signature');
 const { sendAuthenticatedRequest } = require('../services/soapClient');
 
 const router = express.Router();
@@ -15,7 +15,7 @@ const handleDownloadRequest = async (req, res, tipo) => {
     }
 
     try {
-        const signedXml = await signDownloadRequest(fiel, requestData);
+        const signedXml = await generateDownloadSignature(fiel, requestData);
         
         const action = `http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescarga${tipo}`;
         console.log(`[Route] Enviando petición SOAP a ${process.env.SAT_DOWNLOAD_URL} con action: ${action}`);
@@ -54,3 +54,4 @@ router.post('/recibidos', (req, res) => handleDownloadRequest(req, res, 'Recibid
 router.post('/emitidos', (req, res) => handleDownloadRequest(req, res, 'Emitidos'));
 
 module.exports = router;
+
