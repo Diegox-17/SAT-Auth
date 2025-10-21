@@ -1,24 +1,21 @@
+# docker-compose.yml
+
 version: '3.8'
-
-# DECLARAMOS LA RED EXTERNA A LA QUE NOS VAMOS A CONECTAR
-networks:
-  proxy-net:
-    external: true # LE DECIMOS A COMPOSE QUE ESTA RED YA EXISTE, NO DEBE CREARLA
-
 services:
-  sat-auth:
+  sat-auth-service:
     build: .
     container_name: sat-auth-service
     ports:
       - "3000:3000"
-    restart: unless-stopped
-        # CONECTAMOS NUESTRO SERVICIO A ESA RED EXTERNA
     networks:
+      - default   # <-- AÑADE ESTA LÍNEA
       - proxy-net
-      # Por defecto, también se conectará a 'sat_auth_default', lo cual está bien.
     environment:
-      # --- AÑADE ESTAS LÍNEAS ---
       NODE_ENV: production
       SAT_AUTH_URL: "https://cfdi.cloud.sat.gob.mx/Autenticacion/Autenticacion.svc"
       SAT_DOWNLOAD_URL: "https://cfdi.cloud.sat.gob.mx/SolicitaDescarga/SolicitaDescargaService.svc"
-      # ---------------------------
+    restart: unless-stopped
+
+networks:
+  proxy-net:
+    external: true
