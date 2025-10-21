@@ -4,7 +4,7 @@ const { sendSoapRequest } = require('../services/soapClient');
 const { parseStringPromise } = require('xml2js');
 
 const router = express.Router();
-const SAT_AUTH_URL = 'https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/Autenticacion/Autenticacion.svc';
+const SAT_AUTH_URL = process.env.SAT_AUTH_URL;
 const SOAP_ACTION = 'http://DescargaMasivaTerceros.gob.mx/IAutenticacion/Autentica';
 
 router.post('/', async (req, res) => {
