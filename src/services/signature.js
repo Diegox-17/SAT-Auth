@@ -91,6 +91,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
     console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):', sortedAttributes);
     
     const solicitudNode = `<des:solicitud Id="${requestId}" ${sortedAttributes}></des:solicitud>`;
+    //añadido por el usuario
+    console.log('[Signature Service] se generó el solicitudNode con RequestID:', requestId);
 
     const unsignedXml = `
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
