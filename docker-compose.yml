@@ -16,3 +16,10 @@ services:
     networks:
       - proxy-net
       # Por defecto, también se conectará a 'sat_auth_default', lo cual está bien.
+    environment:
+      # --- AÑADE ESTAS LÍNEAS ---
+      NODE_ENV: production
+      SAT_AUTH_URL: "https://cfdi.cloud.sat.gob.mx/Autenticacion/Autenticacion.svc"
+      SAT_DOWNLOAD_URL: "https://cfdi.cloud.sat.gob.mx/SolicitaDescarga/SolicitaDescargaService.svc"
+      # ---------------------------
+    restart: unless-stopped
