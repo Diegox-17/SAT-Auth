@@ -16,6 +16,10 @@ const handleDownloadRequest = async (req, res, tipo) => {
 
     try {
         const signedXml = await generateDownloadSignature(fiel, requestData);
+
+        console.log('--- XML FINAL A PUNTO DE SER ENVIADO AL SAT ---');
+        console.log(signedXml);
+        console.log('---------------------------------------------');
         
         const action = `http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/SolicitaDescarga${tipo}`;
         console.log(`[Route] Enviando petición SOAP a ${process.env.SAT_DOWNLOAD_URL} con action: ${action}`);
@@ -54,4 +58,5 @@ router.post('/recibidos', (req, res) => handleDownloadRequest(req, res, 'Recibid
 router.post('/emitidos', (req, res) => handleDownloadRequest(req, res, 'Emitidos'));
 
 module.exports = router;
+
 
