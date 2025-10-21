@@ -145,32 +145,39 @@ async function generateDownloadSignature(fiel, requestData, type) {
 }
 
 async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
-    const { cerBase64, keyPem, password } = fiel;
-    const cleanCertificate = Buffer.from(cerBase64, 'base64').toString('utf-8')
-        .replace('-----BEGIN CERTIFICATE-----', '')
-        .replace('-----END CERTIFICATE-----', '')
-        .replace(/\s/g, '');
+    const { keyPem, password, cerBase64 } = fiel;
+    const { pki } = require('node-forge');
+    const { SignedXml } = require('xml-crypto');
     
-    // El XML base es muy similar al de la solicitud, solo cambia el nodo principal
-    const soapBody = `
-        <des:VerificaSolicitudDescarga xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <des:solicitud IdSolicitud="${idSolicitud}" RfcSolicitante="${rfcSolicitante}">
-            </des:solicitud>
-        </des:VerificaSolicitudDescarga>
-    `;
+    // El XML base para la verificación es más simple que el de descarga
+    const soapBody = `<des:VerificaSolicitudDescarga xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx"><des:solicitud IdSolicitud="${idSolicitud}" RfcSolicitante="${rfcSolicitante}"></des:solicitud></des:VerificaSolicitudDescarga>`;
+
+    const privateKey = pki.decryptRsaPrivateKey(keyPem, password);
+    const pemPrivateKey = pki.privateKeyToPem(privateKey);
+
+    const signer = new SignedXml();
+    signer.signingKey = pemPrivateKey;
+    signer.addReference(
+        "//*[local-name(.)='solicitud']", // Referencia al nodo a firmar
+        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature"],
+        'http://www.w3.org/2001/04/xmlenc#sha256' // Usamos SHA256, es más seguro
+    );
+
+    const cleanCertificate = cerBase64.replace('-----BEGIN CERTIFICATE-----', '').replace('-----END CERTIFICATE-----', '').replace(/\s/g, '');
+    signer.keyInfoProvider = {
+        getKeyInfo: () => `<X509Data><X509Certificate>${cleanCertificate}</X509Certificate></X509Data>`,
+    };
     
-    // Firmamos el nodo <des:solicitud>
-    const signedXml = await signXml(soapBody, keyPem, password, cleanCertificate, 'des:solicitud');
+    signer.computeSignature(soapBody, {
+        prefix: 'ds',
+        location: { reference: "//*[local-name(.)='solicitud']", action: 'append' },
+    });
 
-    const soapEnvelope = `
-        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <s:Header/>
-            <s:Body>
-                ${signedXml}
-            </s:Body>
-        </s:Envelope>
-    `;
+    const signedXml = signer.getSignedXml();
 
+    // Construimos el sobre SOAP final con el cuerpo ya firmado
+    const soapEnvelope = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx"><s:Header/><s:Body>${signedXml}</s:Body></s:Envelope>`;
+    
     return soapEnvelope;
 }
 
