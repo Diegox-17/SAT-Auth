@@ -81,6 +81,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
+    console.log('[Signature] Objeto requestData recibido:', JSON.stringify(requestData, null, 2));
+
     const serviceNode = `des:SolicitaDescarga${type}`;
     
     // --- NUEVO ENFOQUE: Limpio y sin placeholders ---
