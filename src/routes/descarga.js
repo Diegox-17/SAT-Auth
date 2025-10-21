@@ -7,7 +7,8 @@ const { sendAuthenticatedRequest } = require('../services/soapClient');
 
 // URL del servicio de descarga (es buena práctica tenerla como constante o variable de entorno)
 // URL Aparentemente incorrecta const SAT_DOWNLOAD_URL = "https://descargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc";
-const SAT_DOWNLOAD_URL = "https://descargamasivasolicitud.cloudapp.net/SolicitaDescargaService.svc";
+// URL Aparentemente incorrecta const SAT_DOWNLOAD_URL = "https://descargamasivasolicitud.cloudapp.net/SolicitaDescargaService.svc";
+const SAT_DOWNLOAD_URL = "https://cfdisolicitud.cloudapp.net/SolicitaDescargaService.svc";
 // El namespace es el mismo para ambas operaciones
 const SOAP_ACTION_BASE = "http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService";
 
@@ -65,6 +66,7 @@ router.post('/emitidos', async (req, res) => {
 });
 
 module.exports = router;
+
 
 
 
