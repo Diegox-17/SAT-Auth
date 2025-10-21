@@ -77,12 +77,7 @@ async function generateDownloadSignature(fiel, requestData, type) {
     }
     
     const { cerBase64, keyPem, password } = fiel;
-
-    // --- CORRECCIÓN ---
-    // Se utiliza 'processCertificate' en lugar de la función inexistente 'getCertificateInfo'.
-    // Esta función devuelve el objeto 'certificate' y 'issuerData' que necesitamos.
-    const { certificate, issuerData } = processCertificate(cerBase64);
-    
+    const { certificate, issuerData } = processCertificate(cerBase64); // Usamos la función correcta
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
@@ -125,7 +120,12 @@ async function generateDownloadSignature(fiel, requestData, type) {
         ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
+
+    // --- CORRECCIÓN ---
+    // Se añade el prefijo 'xd' para la firma, haciéndola consistente con el KeyInfoProvider.
+    // Esto resuelve el error "Unexpected character #".
     sig.computeSignature(unsignedXml, {
+        prefix: 'xd', // <-- ESTA ES LA LÍNEA QUE SOLUCIONA EL PROBLEMA
         location: {
             reference: `//*[local-name(.)='solicitud']`,
             action: 'append'
