@@ -22,4 +22,3 @@ services:
       SAT_AUTH_URL: "https://cfdi.cloud.sat.gob.mx/Autenticacion/Autenticacion.svc"
       SAT_DOWNLOAD_URL: "https://cfdi.cloud.sat.gob.mx/SolicitaDescarga/SolicitaDescargaService.svc"
       # ---------------------------
-    restart: unless-stopped
