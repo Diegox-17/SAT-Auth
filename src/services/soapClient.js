@@ -52,8 +52,14 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
             tagNameProcessors: [tag => tag.replace('s:', '').replace('des:', '')]
         });
 
-        console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
-        console.log(JSON.stringify(parsedData, null, 2));
+        //console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
+        //console.log(JSON.stringify(parsedData, null, 2));
+
+        // --- LA RUTA CORRECTA Y FINAL ---
+        // Basada en la respuesta real que recibimos del SAT.
+        const result = parsedData.Envelope.Body.SolicitaDescargaRecibidosResponse.SolicitaDescargaRecibidosResult.$;
+        
+        console.log('[SOAP Client] Respuesta del SAT extraída con éxito:', result);
 
         // Extraer el resultado directamente
         const result = parsedData.Envelope.Body.SolicitaDescargaResult;
