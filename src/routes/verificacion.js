@@ -2,32 +2,62 @@
 
 const express = require('express');
 const { signVerificationRequest } = require('../services/signature');
-const { sendSoapRequest } = require('../services/soapClient');
+const { sendAuthenticatedRequest } = require('../services/soapClient');
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    const { authToken, fiel, idSolicitud, rfcSolicitante } = req.body;
+    const { authToken, fiel, idSolicitud } = req.body;
 
-    if (!authToken || !fiel || !idSolicitud || !rfcSolicitante) {
-        return res.status(400).json({ error: 'Faltan parámetros requeridos: authToken, fiel, idSolicitud, rfcSolicitante.' });
+    // --- VALIDACIÓN CORREGIDA Y ROBUSTA ---
+    // 1. Validar que los objetos principales existen
+    if (!authToken || !fiel || !idSolicitud) {
+        return res.status(400).json({ 
+            error: 'Faltan parámetros principales. Se requiere: authToken, fiel, idSolicitud.' 
+        });
     }
 
-    try {
-        // 1. Generar el XML firmado para la verificación
-        const signedXml = await signVerificationRequest(fiel, idSolicitud, rfcSolicitante);
+    // 2. Validar que el objeto 'fiel' está completo
+    if (!fiel.rfc || !fiel.cerBase64 || !fiel.keyPem || !fiel.password) {
+        return res.status(400).json({ 
+            error: 'El objeto "fiel" está incompleto. Se requiere: rfc, cerBase64, keyPem y password.' 
+        });
+    }
+    // --- FIN DE LA VALIDACIÓN ---
 
-        // 2. Enviar la petición SOAP al SAT
-        const soapResponse = await sendSoapRequest(
+    try {
+        // Ahora es seguro usar fiel.rfc
+        const rfcSolicitante = fiel.rfc;
+
+        const signedXml = await signVerificationRequest(fiel, idSolicitud, rfcSolicitante);
+        
+        const soapResponse = await sendAuthenticatedRequest(
             process.env.SAT_VERIFY_URL,
             signedXml,
-            'http://DescargaMasivaTerceros.gob.mx/IVerificaSolicitudDescargaService/VerificaSolicitudDescarga',
-            authToken // El token se pasa aquí para ser incluido en el header
+            'http://DescargaMasivaTerceros.sat.gob.mx/IVerificaSolicitudDescargaService/VerificaSolicitudDescarga',
+            authToken
         );
+
+        if (!soapResponse.success) {
+            const statusCode = soapResponse.error?.statusCode || 500;
+            return res.status(statusCode).json({ error: 'Error del servicio del SAT', details: soapResponse.error?.message });
+        }
         
-        // 3. Procesar y devolver la respuesta del SAT
-        // (Aquí se agregará la lógica de parsing de xml2js)
-        res.status(200).json(soapResponse); // Por ahora devolvemos la respuesta cruda
+        const result = soapResponse.data.VerificaSolicitudDescargaResponse.VerificaSolicitudDescargaResult;
+        
+        const status = result.$;
+        const packageIds = result.IdsPaquetes || null;
+
+        const finalResponse = {
+            CodEstatus: status.CodEstatus,
+            EstadoSolicitud: status.EstadoSolicitud,
+            CodigoEstadoSolicitud: status.CodigoEstadoSolicitud,
+            NumeroCFDIs: status.NumeroCFDIs,
+            Mensaje: status.Mensaje,
+            Paquetes: Array.isArray(packageIds) ? packageIds : (packageIds ? [packageIds] : [])
+        };
+
+        res.status(200).json(finalResponse);
 
     } catch (error) {
         console.error('Error en el endpoint de verificación:', error.message);
