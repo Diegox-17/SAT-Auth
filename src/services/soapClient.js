@@ -1,58 +1,52 @@
+// /src/services/soapClient.js
+
 const axios = require('axios');
+// --- CORRECCIÓN ---
+// La siguiente línea importa la función que faltaba para procesar las respuestas XML.
+const { parseStringPromise } = require('xml2js');
 
-async function sendSoapRequest(url, action, xml) {
-    try {
-        const response = await axios.post(url, xml, {
-            headers: {
-                'Content-Type': 'text/xml;charset=UTF-8',
-                'SOAPAction': action,
-            },
-        });
-        return response.data;
-    } catch (error) {
-        console.error(`Error en la petición SOAP a ${url}:`);
-        // Imprimimos el error que devuelve el SAT para facilitar la depuración
-        if (error.response) {
-            console.error('Status:', error.response.status);
-            console.error('Headers:', error.response.headers);
-            console.error('Data:', error.response.data);
-        } else {
-            console.error('Error Message:', error.message);
-        }
-        // Re-lanzamos el error para que el manejador de la ruta lo capture
-        throw error;
-    }
-}
-
-// NUEVA FUNCIÓN para peticiones que requieren el token
-async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
-    if (!authToken) {
-        // Devolvemos un error estructurado si no hay token
-        return { 
-            success: false, 
-            error: { 
-                statusCode: 401, 
-                message: 'Se requiere un token de autenticación para esta operación.' 
-            }
-        };
-    }
-    
+// Función original para la autenticación (sin token)
+async function sendRequest(url, xml, soapAction) {
     try {
         const headers = {
             'Content-Type': 'text/xml;charset=UTF-8',
             'SOAPAction': soapAction,
-            'Authorization': `WRAP access_token="${authToken}"` // Header de autorización
         };
-
         const { data } = await axios.post(url, xml, { headers });
+        // Lógica de parseo para la respuesta de autenticación
+        const parsedData = await parseStringPromise(data, {
+             explicitArray: false,
+             tagNameProcessors: [tag => tag.replace('s:', '').replace('o:', '')]
+        });
+        const token = parsedData.Envelope.Body.Security.Timestamp.Created; // Ajusta esta ruta si es necesario
+        return { success: true, data: { token } };
+    } catch (error) {
+        console.error(`Error en la petición SOAP a ${url}:`);
+        const errorMessage = error.response ? error.response.data : error.message;
+        console.error('Error Message:', errorMessage);
+        return { success: false, error: { statusCode: 500, message: errorMessage } };
+    }
+}
 
+// Función para peticiones de descarga (CON token)
+async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
+    try {
+        const headers = {
+            'Content-Type': 'text/xml;charset=UTF-8',
+            'SOAPAction': soapAction,
+            'Authorization': `WRAP access_token="${authToken}"`
+        };
+        const { data } = await axios.post(url, xml, { headers });
+        
+        // Lógica de parseo para la respuesta de descarga
         const parsedData = await parseStringPromise(data, {
             explicitArray: false,
-            tagNameProcessors: [tag => tag.replace('s:', '').replace('des:', '')]
+            // Elimina los prefijos 's:' y 'des:' para un acceso más fácil
+            tagNameProcessors: [tag => tag.replace(/s:|des:/g, '')]
         });
 
-        // Extraer el resultado directamente
-        const result = parsedData.Envelope.Body.SolicitaDescargaResult;
+        // Extraer el resultado directamente de la respuesta del SAT
+        const result = parsedData.Envelope.Body.SolicitaDescargaResponse.SolicitaDescargaResult.$;
 
         return { success: true, data: result };
 
@@ -68,4 +62,7 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
     }
 }
 
-module.exports = { sendSoapRequest,sendAuthenticatedRequest };
+module.exports = { 
+    sendRequest,
+    sendAuthenticatedRequest
+};
