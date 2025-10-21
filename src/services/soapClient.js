@@ -58,11 +58,7 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
         // --- LA RUTA CORRECTA Y FINAL ---
         // Basada en la respuesta real que recibimos del SAT.
         const result = parsedData.Envelope.Body.SolicitaDescargaRecibidosResponse.SolicitaDescargaRecibidosResult.$;
-        
         console.log('[SOAP Client] Respuesta del SAT extraída con éxito:', result);
-
-        // Extraer el resultado directamente
-        const result = parsedData.Envelope.Body.SolicitaDescargaResult;
 
         return { success: true, data: result };
 
