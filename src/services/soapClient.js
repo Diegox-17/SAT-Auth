@@ -52,14 +52,17 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
             tagNameProcessors: [tag => tag.replace('s:', '').replace('des:', '')]
         });
 
+        console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
+        console.log(JSON.stringify(parsedData, null, 2));
+
         // Extraer el resultado directamente
         const result = parsedData.Envelope.Body.SolicitaDescargaResult;
 
-        console.log('[SOAP Client] Objeto de respuesta extraído del SAT:', JSON.stringify(result, null, 2));
-
         return { success: true, data: result };
 
-    } catch (error) {
+    } 
+    
+    catch (error) {
         console.error('SOAP Client Authenticated Error:', error.response ? error.response.data : error.message);
         return { 
             success: false, 
