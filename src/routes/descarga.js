@@ -14,20 +14,26 @@ const SOAP_ACTION_BASE = "http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDesc
 // Función para manejar la respuesta y evitar código repetido
 const handleResponse = (res, result) => {
     if (result.success) {
+        console.log('[Route] Petición exitosa. Enviando respuesta al cliente.');
         res.status(200).json(result.data);
     } else {
+        console.error('[Route] Error en la petición:', result.error);
         res.status(result.error.statusCode || 500).json({ message: result.error.message });
     }
 };
 
 
 router.post('/recibidos', async (req, res) => {
+    console.log('\n--- [Route] Nueva petición a /descarga/recibidos ---');
     try {
         const { authToken, fiel, requestData } = req.body;
+        console.log('[Route] Datos de la solicitud recibidos:', requestData);
         
         const signedXml = await generateDownloadSignature(fiel, requestData, 'Recibidos');
         
         const soapAction = `${SOAP_ACTION_BASE}/SolicitaDescargaRecibidos`;
+        console.log(`[Route] Enviando petición SOAP a ${SAT_DOWNLOAD_URL} con action: ${soapAction}`);
+        
         const result = await sendAuthenticatedRequest(SAT_DOWNLOAD_URL, signedXml, soapAction, authToken);
         
         handleResponse(res, result);
@@ -41,10 +47,13 @@ router.post('/recibidos', async (req, res) => {
 router.post('/emitidos', async (req, res) => {
     try {
         const { authToken, fiel, requestData } = req.body;
+        console.log('[Route] Datos de la solicitud recibidos:', requestData);
 
         const signedXml = await generateDownloadSignature(fiel, requestData, 'Emitidos');
 
         const soapAction = `${SOAP_ACTION_BASE}/SolicitaDescargaEmitidos`;
+        console.log(`[Route] Enviando petición SOAP a ${SAT_DOWNLOAD_URL} con action: ${soapAction}`);
+        
         const result = await sendAuthenticatedRequest(SAT_DOWNLOAD_URL, signedXml, soapAction, authToken);
 
         handleResponse(res, result);
@@ -55,4 +64,5 @@ router.post('/emitidos', async (req, res) => {
 });
 
 module.exports = router;
+
 
