@@ -88,7 +88,7 @@ async function generateDownloadSignature(fiel, requestData, type) {
         .sort()
         .map(key => `${key}="${requestData[key]}"`)
         .join(' ');
-    console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):', sortedAttributes);
+    console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):');
     
     // --- NUEVO ENFOQUE ---
     // 1. Crear el XML con un placeholder para la firma.
@@ -128,7 +128,9 @@ async function generateDownloadSignature(fiel, requestData, type) {
         </s:Envelope>
     `.trim();
 
-    console.log('[Signature Service] XML con placeholder generado. A punto de calcular la firma.');
+    console.log('[Signature Service] XML con placeholder generado.:'xmlWithPlaceholder);
+                
+    console.log('A punto de calcular la firma.');
 
     // 2. Usar la librería para "rellenar" los valores de la firma.
     const sig = new SignedXml();
@@ -147,6 +149,7 @@ async function generateDownloadSignature(fiel, requestData, type) {
     const finalXml = sig.getSignedXml();
 
     console.log('[Signature Service] Firma generada y rellenada exitosamente. XML listo para enviar.');
+    console.log('el XML final es: ',finalXml);
     // console.log(finalXml); // Descomenta para depuración final si es necesario
 
     return finalXml;
