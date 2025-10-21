@@ -70,6 +70,7 @@ function createAuthSignature(cerBase64, keyPem, password) {
 
 
 //Función de descargas:
+// /src/services/signature.js (solo la función de descarga)
 async function generateDownloadSignature(fiel, requestData, type) {
     console.log(`[Signature Service] Iniciando generación de firma para descarga de tipo: ${type}`);
     if (!fiel || !fiel.cerBase64 || !fiel.keyPem || !fiel.password) {
@@ -77,7 +78,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
     }
 
     const { cerBase64, keyPem, password } = fiel;
-    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64); // Usamos la función correcta
+    // Usamos processCertificate para obtener todos los datos necesarios
+    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64); 
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
@@ -90,65 +92,59 @@ async function generateDownloadSignature(fiel, requestData, type) {
         .join(' ');
     console.log('[Signature Service] Atributos de la solicitud (ordenados alfabéticamente):', sortedAttributes);
     
-    // --- NUEVO ENFOQUE ---
-    // 1. Crear el XML con un placeholder para la firma.
-    // El namespace 'xd' se define en el sobre para que sea válido en todo el documento.
-    const xmlWithPlaceholder = `
-        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx" xmlns:xd="http://www.w3.org/2000/09/xmldsig#">
+    // 1. Construir el XML SIN el bloque de la firma (el método más limpio)
+    const unsignedXml = `
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
             <s:Header/>
             <s:Body>
                 <${serviceNode}>
-                    <des:solicitud Id="${requestId}" ${sortedAttributes}>
-                        <xd:Signature>
-                            <xd:SignedInfo>
-                                <xd:CanonicalizationMethod Algorithm="http://www.w.org/2001/10/xml-exc-c14n#"/>
-                                <xd:SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-                                <xd:Reference URI="#${requestId}">
-                                    <xd:Transforms>
-                                        <xd:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-                                    </xd:Transforms>
-                                    <xd:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-                                    <xd:DigestValue/>
-                                </xd:Reference>
-                            </xd:SignedInfo>
-                            <xd:SignatureValue/>
-                            <xd:KeyInfo>
-                                <xd:X509Data>
-                                    <xd:X509IssuerSerial>
-                                        <xd:X509IssuerName>${issuerData}</xd:X509IssuerName>
-                                        <xd:X509SerialNumber>${certificate.serialNumber}</xd:X509SerialNumber>
-                                    </xd:X509IssuerSerial>
-                                    <xd:X509Certificate>${pureCertBase64}</xd:X509Certificate>
-                                </xd:X509Data>
-                            </xd:KeyInfo>
-                        </xd:Signature>
-                    </des:solicitud>
+                    <des:solicitud Id="${requestId}" ${sortedAttributes}></des:solicitud>
                 </${serviceNode}>
             </s:Body>
         </s:Envelope>
     `.trim();
 
-    console.log('[Signature Service] XML con placeholder generado. A punto de calcular la firma.');
-
-    // 2. Usar la librería para "rellenar" los valores de la firma.
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
-    // NOTA: Con este método, no necesitamos 'signatureAlgorithm', 'keyInfoProvider', etc.,
-    // porque ya están definidos en el placeholder del XML.
-    
-    // La referencia ahora es al nodo <Signature> mismo.
-    sig.addReference("//*[local-name(.)='SignedInfo']");
-    
-    // 3. Calcular la firma sobre el XML que ya contiene la estructura.
-    sig.computeSignature(xmlWithPlaceholder);
+    // 2. Definir cómo se verá el bloque KeyInfo, usando X509Data como pide el SAT para descargas
+    sig.keyInfoProvider = {
+        getKeyInfo: () => `<xd:X509Data>
+                               <xd:X509IssuerSerial>
+                                   <xd:X509IssuerName>${issuerData}</xd:X509IssuerName>
+                                   <xd:X509SerialNumber>${certificate.serialNumber}</xd:X509SerialNumber>
+                               </xd:X509IssuerSerial>
+                               <xd:X509Certificate>${pureCertBase64}</xd:X509Certificate>
+                           </xd:X509Data>`
+    };
 
-    // 4. Obtener el XML final con los valores de DigestValue y SignatureValue calculados.
+    // 3. Añadir la referencia al nodo que queremos firmar, usando su ID
+    sig.addReference(
+        `#${requestId}`, // Referencia directa al ID del nodo <des:solicitud>
+        [
+            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+            "http://www.w3.org/2001/10/xml-exc-c14n#"
+        ],
+        "http://www.w3.org/2000/09/xmldsig#sha1"
+    );
+
+    console.log('[Signature Service] A punto de calcular la firma final...');
+
+    // 4. Calcular la firma y decirle a la librería EXACTAMENTE dónde inyectarla.
+    sig.computeSignature(unsignedXml, {
+        prefix: 'xd', // Prefijo para los elementos de la firma (xd:Signature, xd:SignedInfo, etc.)
+        location: {
+            // El XPath le dice: "Busca el nodo llamado 'solicitud'..."
+            reference: `//*[local-name(.)='solicitud']`,
+            // "...y añade la firma como el último hijo dentro de él."
+            action: 'append'
+        }
+    });
+
     const finalXml = sig.getSignedXml();
-
-    console.log('[Signature Service] Firma generada y rellenada exitosamente. XML listo para enviar.');
-    // console.log(finalXml); // Descomenta para depuración final si es necesario
-
+    console.log('[Signature Service] Firma final generada y colocada correctamente.');
+    
     return finalXml;
 }
 
