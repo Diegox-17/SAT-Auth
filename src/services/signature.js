@@ -76,37 +76,31 @@ async function generateDownloadSignature(fiel, requestData, type) {
         throw new Error("El objeto 'fiel' y sus propiedades son requeridos.");
     }
 
+    // 1. Conservamos toda tu lógica inicial de preparación
     const { cerBase64, keyPem, password } = fiel;
     const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
-    console.log('[Signature] Objeto requestData recibido:', JSON.stringify(requestData, null, 2));
-
-    const serviceNode = `des:SolicitaDescarga${type}`;
+    const attributesString = Object.keys(requestData).sort()
+        .map(key => `${key}="${requestData[key]}"`)
+        .join(' ');
     
-    // --- NUEVO ENFOQUE: Limpio y sin placeholders ---
-    // 1. Construir el XML sin ningún bloque de firma.
-    const unsignedXml = `
-        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <s:Header/>
-            <s:Body>
-                <${serviceNode}>
-                    <des:solicitud ${Object.keys(requestData).sort().map(key => `${key}="${requestData[key]}"`).join(' ')}>
-                    </des:solicitud>
-                </${serviceNode}>
-            </s:Body>
-        </s:Envelope>
+    // --- LA CORRECCIÓN ESTRUCTURAL ---
+    // 2. Creamos solo el CUERPO del XML que será firmado (sin el sobre <s:Envelope>)
+    const serviceNode = `des:SolicitaDescarga${type}`;
+    const soapBody = `
+        <${serviceNode} xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+            <des:solicitud ${attributesString}>
+            </des:solicitud>
+        </${serviceNode}>
     `.trim();
 
-    console.log('[Signature Service] XML limpio generado. A punto de calcular y adjuntar firma.');
-    // console.log(unsignedXml); // Descomentar para ver el XML antes de firmar
-
+    // 3. La configuración de la firma es idéntica
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
-    // 2. Definir el KeyInfoProvider para que la firma incluya los datos del certificado.
     sig.keyInfoProvider = {
         getKeyInfo: (key, prefix) => {
             prefix = prefix ? prefix + ':' : '';
@@ -120,31 +114,44 @@ async function generateDownloadSignature(fiel, requestData, type) {
         }
     };
 
-    // 3. Añadir la referencia usando un XPath robusto, igual que en la autenticación.
-    // Esto es mucho más fiable que usar referencias por #Id.
     sig.addReference(
-        "//*[local-name(.)='solicitud']", // Referencia al nodo de la solicitud
-        [
-            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-            "http://www.w3.org/2001/10/xml-exc-c14n#"
-        ],
+        "//*[local-name(.)='solicitud']",
+        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
 
-    // 4. Calcular la firma, especificando el prefijo y la ubicación para inyectarla.
-    sig.computeSignature(unsignedXml, {
-        prefix: 'xd', // Prefijo para los elementos de la firma (ej: <xd:Signature>)
+    // 4. Calculamos la firma sobre el CUERPO, no sobre el sobre completo
+    sig.computeSignature(soapBody, {
+        prefix: 'xd',
         location: {
-            reference: "//*[local-name(.)='solicitud']", // Inyectar la firma DENTRO del nodo de solicitud
+            reference: "//*[local-name(.)='solicitud']",
             action: 'append'
         }
     });
 
-    const finalXml = sig.getSignedXml();
-    console.log('[Signature Service] Firma generada e inyectada exitosamente. XML listo para enviar.');
+    // 5. Obtenemos el cuerpo ya firmado
+    const signedBodyXml = sig.getSignedXml();
+
+    // 6. Envolvemos el cuerpo firmado en el sobre final, igual que en signAuthRequest
+    const finalXml = `
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            <s:Header/>
+            <s:Body>
+                ${signedBodyXml}
+            </s:Body>
+        </s:Envelope>
+    `.trim();
     
+    console.log('[Signature Service] Firma generada y XML envuelto exitosamente.');
     return finalXml;
 }
+
+// Asegúrate que tu module.exports siga siendo el correcto
+module.exports = {
+    signAuthRequest,
+    generateDownloadSignature,
+    signVerificationRequest
+};
 
 async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
     const { keyPem, password, cerBase64 } = fiel;
