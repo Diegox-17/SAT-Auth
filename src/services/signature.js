@@ -146,13 +146,6 @@ async function generateDownloadSignature(fiel, requestData, type) {
     return finalXml;
 }
 
-// Asegúrate que tu module.exports siga siendo el correcto
-module.exports = {
-    signAuthRequest,
-    generateDownloadSignature,
-    signVerificationRequest
-};
-
 async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
     const { keyPem, password, cerBase64 } = fiel;
     const { pki } = require('node-forge');
