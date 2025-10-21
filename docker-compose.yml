@@ -14,6 +14,7 @@ services:
       NODE_ENV: production
       SAT_AUTH_URL: "https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/Autenticacion/Autenticacion.svc"
       SAT_DOWNLOAD_URL: "https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/SolicitaDescargaService.svc"
+      SAT_VERIFY_URL: "https://cfdidescargamasivasolicitud.clouda.sat.gob.mx/VerificaSolicitudDescargaService.svc"
     restart: unless-stopped
 
 networks:
