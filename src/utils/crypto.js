@@ -7,14 +7,11 @@ function processCertificate(cerBase64) {
     const cerAsn1 = forge.asn1.fromDer(cerDer);
     const certificate = forge.pki.certificateFromAsn1(cerAsn1);
 
-    // --- LÓGICA ARMONIZADA Y ROBUSTA ---
-    // Genera una cadena de emisor estándar y limpia, aceptada por todos los servicios.
-    const issuerAttributes = certificate.issuer.attributes;
-    const issuerData = issuerAttributes.map(attr => {
-        const shortName = attr.shortName || attr.name;
-        return `${shortName}=${attr.value}`;
-    }).join(', ');
-    // --- FIN DE LA LÓGICA ---
+    // --- LA FORMA CORRECTA Y SEGURA DE OBTENER LOS DATOS DEL EMISOR ---
+    // Usamos el método de la librería para convertir los atributos a una cadena segura.
+    // Esto evita problemas de caracteres especiales y formato.
+    const issuerData = certificate.issuer.toString();
+    // --- FIN DE LA CORRECCIÓN ---
 
     const certificatePem = forge.pki.certificateToPem(certificate);
     const pureCertBase64 = certificatePem
