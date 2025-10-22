@@ -3,12 +3,11 @@
 const express = require('express');
 const { signPackageDownloadRequest } = require('../services/signature');
 const { sendAuthenticatedRequest } = require('../services/soapClient');
-
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    // Definimos idPaquete aquí para que esté disponible en todo el scope de la función
     const { authToken, fiel, idPaquete } = req.body;
+    console.log('--------- [DESCARGA DE PAQUETES] iniciando descarga del paquete id:' ${idPaquete} '-----------');
 
     if (!authToken || !fiel || !idPaquete || !fiel.rfc) {
         return res.status(400).json({ error: 'Parámetros requeridos: authToken, fiel (con rfc), idPaquete.' });
