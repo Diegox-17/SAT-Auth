@@ -17,7 +17,7 @@ router.post('/', async (req, res) => {
     try {
         const signedXml = await signPackageDownloadRequest(fiel, idPaquete, fiel.rfc);
 
-        const soapAction = 'http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/Descargar';
+        const soapAction = 'http://DescargaMasivaTerceros.sat.gob.mx/IDescargaMasivaTercerosService/Descargar';
 
         const soapResponse = await sendAuthenticatedRequest(
             process.env.SAT_PACKAGE_DOWNLOAD_URL,
