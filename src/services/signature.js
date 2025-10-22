@@ -263,7 +263,7 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     sig.computeSignature(soapBody, {
         prefix: 'xd', // Usamos el mismo prefijo
         location: {
-            reference: "//*[local-name(.)='solicitud']",
+            reference: "//*[local-name(.)='peticionDescarga']",
             action: 'append'
         }
     });
