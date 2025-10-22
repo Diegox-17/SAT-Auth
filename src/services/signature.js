@@ -78,9 +78,12 @@ async function generateDownloadSignature(fiel, requestData, type) {
 
     // 1. Conservamos toda tu lógica inicial de preparación
     const { cerBase64, keyPem, password } = fiel;
-    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
+    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+
+    // Construimos issuerData aquí dentro, de forma segura
+    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
 
     const attributesString = Object.keys(requestData).sort()
         .map(key => `${key}="${requestData[key]}"`)
@@ -99,20 +102,8 @@ async function generateDownloadSignature(fiel, requestData, type) {
     // 3. La configuración de la firma es idéntica
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
-    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    
-    sig.keyInfoProvider = {
-        getKeyInfo: (key, prefix) => {
-            prefix = prefix ? prefix + ':' : '';
-            return `<${prefix}X509Data>
-                        <${prefix}X509IssuerSerial>
-                            <${prefix}X509IssuerName>${issuerData}</${prefix}X509IssuerName>
-                            <${prefix}X509SerialNumber>${certificate.serialNumber}</${prefix}X509SerialNumber>
-                        </${prefix}X509IssuerSerial>
-                        <${prefix}X509Certificate>${pureCertBase64}</${prefix}X509Certificate>
-                    </${prefix}X509Data>`;
-        }
-    };
+    sig.keyInfoProvider = { 
+        getKeyInfo: () => `<X509Data><X509IssuerSerial><X509IssuerName>${issuerData}</X509IssuerName><X509SerialNumber>${certificate.serialNumber}</X509SerialNumber></X509IssuerSerial><X509Certificate>${pureCertBase64}</X509Certificate></X509Data>` };
 
     sig.addReference(
         "//*[local-name(.)='solicitud']",
@@ -149,11 +140,11 @@ async function generateDownloadSignature(fiel, requestData, type) {
 async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
     console.log(`[Signature Service] Iniciando firma para Verificación de Solicitud`);
     const { cerBase64, keyPem, password } = fiel;
-
-    // 1. Reutilizamos exactamente la misma lógica de preparación de datos que ya funciona
-    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
+    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+    
+    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
 
     // 2. Construimos el cuerpo SOAP específico para la verificación
     const soapBody = `
@@ -221,10 +212,10 @@ async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
 async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     console.log(`[Signature Service] Iniciando firma para descarga del paquete: ${idPaquete}`);
     const { cerBase64, keyPem, password } = fiel;
-
-    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
+    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
-    const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+    const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);    
+    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
 
     // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
     const soapBody = `
