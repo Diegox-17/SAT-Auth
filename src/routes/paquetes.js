@@ -7,47 +7,42 @@ const { sendAuthenticatedRequest } = require('../services/soapClient');
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    // ... (la validación se queda igual)
+    // Definimos idPaquete aquí para que esté disponible en todo el scope de la función
+    const { authToken, fiel, idPaquete } = req.body;
+
+    if (!authToken || !fiel || !idPaquete || !fiel.rfc) {
+        return res.status(400).json({ error: 'Parámetros requeridos: authToken, fiel (con rfc), idPaquete.' });
+    }
+
     try {
         const signedXml = await signPackageDownloadRequest(fiel, idPaquete, fiel.rfc);
 
-        // --- LA CORRECCIÓN CLAVE ---
-        // La URL apunta a SolicitaDescargaService.svc, por lo tanto, la interfaz es ISolicitaDescargaService.
         const soapAction = 'http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/Descargar';
-        // --- FIN DE LA CORRECCIÓN ---
 
         const soapResponse = await sendAuthenticatedRequest(
-            process.env.SAT_PACKAGE_DOWNLOAD_URL, // Esta ahora apunta a la URL correcta
+            process.env.SAT_PACKAGE_DOWNLOAD_URL,
             signedXml,
-            soapAction, // Y esta es la SOAPAction correcta para esa URL
+            soapAction,
             authToken
         );
 
         if (!soapResponse.success) {
-            return res.status(soapResponse.error.statusCode || 500).json({ error: 'Error del SAT al solicitar descarga', details: soapResponse.error.message });
-        }
-
-        // --- LÓGICA FINAL Y CORRECTA ---
-        // 1. Extraemos el header y el body del sobre
-        const header = soapResponse.data.Header;
-        const body = soapResponse.data.Body;
-
-        // 2. Revisamos el estado en el header
-        const status = header.respuesta.$; // Los atributos están en el objeto '$'
-        console.log('[Route Paquetes] Respuesta del Header del SAT:', status);
-
-        if (status.CodEstatus !== '5000') {
-            // Si el código no es 5000, es un error. Devolvemos el mensaje del header.
-            return res.status(400).json({
-                error: 'El SAT rechazó la descarga del paquete.',
-                details: `Código: ${status.CodEstatus} - Mensaje: ${status.Mensaje}`
+            console.error('[Route Paquetes] El SAT devolvió un error:', soapResponse.error);
+            return res.status(soapResponse.error.statusCode || 500).json({ 
+                error: 'El SAT rechazó la descarga del paquete.', 
+                details: soapResponse.error.message 
             });
         }
         
-        // 3. Si el estado es 5000, procedemos a extraer el paquete del body
-        const packageBase64 = body.RespuestaDescargaMasivaTercerosSalida.Paquete;
+        // --- LÓGICA ROBUSTA PARA PROCESAR LA RESPUESTA ---
+        // La respuesta de descarga, a diferencia de las otras, NO tiene la estructura anidada.
+        // El paquete viene directamente en el Body.
+        const packageBase64 = soapResponse.data.Paquete;
+
         if (!packageBase64) {
-            return res.status(404).json({ error: 'El SAT reportó éxito (5000) pero no devolvió un paquete.' });
+            // Esto puede pasar si el SAT devuelve una respuesta 200 OK pero sin el paquete.
+            // Aunque es raro, es bueno manejarlo.
+            return res.status(404).json({ error: 'El SAT no devolvió un paquete en la respuesta, aunque la petición fue exitosa.' });
         }
 
         const packageBuffer = Buffer.from(packageBase64, 'base64');
@@ -57,7 +52,8 @@ router.post('/', async (req, res) => {
         res.send(packageBuffer);
 
     } catch (error) {
-        console.error(`[Route Paquetes] Error fatal al descargar el paquete ${idPaquete}:`, error);
+        // Ahora 'idPaquete' SÍ existe en este scope.
+        console.error(`[Route Paquetes] Error fatal al procesar el paquete ${idPaquete}:`, error);
         res.status(500).json({ error: 'Error interno del servidor.', details: error.message });
     }
 });
