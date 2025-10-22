@@ -21,9 +21,9 @@ router.post('/', async (req, res) => {
     
     // Verificamos que los datos no estén vacíos y tengan un formato plausible
     console.log('[AUTH] Parámetros recibidos. Verificando contenido...');
-    console.log(`[AUTH]   - cerBase64 recibido (primeros 20 chars): ${cerBase64.substring(0, 20)}...`);
-    console.log(`[AUTH]   - keyPem recibido (primeros 20 chars): ${keyPem.substring(0, 20)}...`);
-    console.log(`[AUTH]   - password recibido: ${password ? 'Sí' : 'No'}`);
+    //console.log(`[AUTH]   - cerBase64 recibido (primeros 20 chars): ${cerBase64.substring(0, 20)}...`);
+    //console.log(`[AUTH]   - keyPem recibido (primeros 20 chars): ${keyPem.substring(0, 20)}...`);
+    //console.log(`[AUTH]   - password recibido: ${password ? 'Sí' : 'No'}`);
 
     try {
         console.log('[AUTH] PASO 1: Llamando a createAuthSignature...');
@@ -33,12 +33,12 @@ router.post('/', async (req, res) => {
             throw new Error('createAuthSignature no devolvió ningún XML.');
         }
 
-        console.log('[AUTH] PASO 1 completado. XML Firmado generado.');
+        //console.log('[AUTH] PASO 1 completado. XML Firmado generado.');
         // console.log('[AUTH] XML Firmado (para depuración):\n', signedXml); // Descomenta solo si es absolutamente necesario
 
         console.log('[AUTH] PASO 2: Enviando petición SOAP al SAT...');
         const satResponseXml = await sendSoapRequest(SAT_AUTH_URL, SOAP_ACTION, signedXml);
-        console.log('[AUTH] PASO 2 completado. Respuesta del SAT recibida.');
+        //console.log('[AUTH] PASO 2 completado. Respuesta del SAT recibida.');
 
         console.log('[AUTH] PASO 3: Procesando respuesta del SAT...');
         const parsedResponse = await parseStringPromise(satResponseXml, { explicitArray: false, tagNameProcessors: [str => str.split(':').pop()] });
