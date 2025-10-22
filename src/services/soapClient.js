@@ -45,6 +45,11 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
             'Authorization': `WRAP access_token="${authToken}"` // Header de autorización
         };
 
+        console.log(`\n[SOAP Client DEBUG] Respuesta CRUDA del SAT para la acción: ${soapAction}`);
+        console.log('----------------------------------------------------');
+        console.log(data); // <--- ESTA ES LA EVIDENCIA QUE NECESITAMOS
+        console.log('----------------------------------------------------\n');
+
         const { data } = await axios.post(url, xml, { headers });
 
         const parsedData = await parseStringPromise(data, {
