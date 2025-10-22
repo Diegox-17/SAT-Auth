@@ -217,4 +217,45 @@ async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
     return finalXml;
 }
 
-module.exports = { createAuthSignature, generateDownloadSignature, signVerificationRequest };
+//función para la descarga de paquetes
+async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
+    console.log(`[Signature Service] Iniciando firma para descarga del paquete: ${idPaquete}`);
+    const { cerBase64, keyPem, password } = fiel;
+
+    const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
+    const privateKey = decryptPrivateKey(keyPem, password);
+    const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+
+    // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
+    const soapBody = `
+        <des:PeticionDescargaMasivaTercerosEntrada xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+            <des:peticionDescarga IdPaquete="${idPaquete}" RfcSolicitante="${rfcSolicitante}">
+            </des:peticionDescarga>
+        </des:PeticionDescargaMasivaTercerosEntrada>
+    `.trim();
+
+    // 2. La configuración de la firma es idéntica a las otras que ya funcionan
+    const sig = new SignedXml();
+    sig.signingKey = pemPrivateKey;
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    
+    sig.keyInfoProvider = { /* ... (código idéntico al de tus otras funciones) ... */ };
+
+    sig.addReference(
+        "//*[local-name(.)='peticionDescarga']", // Firmamos el nodo 'peticionDescarga'
+        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
+        "http://www.w3.org/2000/09/xmldsig#sha1"
+    );
+
+    sig.computeSignature(soapBody, { /* ... (código idéntico al de tus otras funciones) ... */ });
+
+    const signedBodyXml = sig.getSignedXml();
+
+    // 3. Envolvemos en el sobre final
+    const finalXml = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Header/><s:Body>${signedBodyXml}</s:Body></s:Envelope>`;
+
+    console.log('[Signature Service] Firma de descarga de paquete generada exitosamente.');
+    return finalXml;
+}
+
+module.exports = { createAuthSignature, generateDownloadSignature, signVerificationRequest, signPackageDownloadRequest };
