@@ -225,14 +225,20 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
     console.log(`[Signature Service] 2. Hemos leido el certificate, issuerData y pureCertBase64 para generar el cerBase64`);
     const privateKey = decryptPrivateKey(keyPem, password);
-    console.log(`[Signature Service] 3. Obtuvimos el privateKey: ${decryptPrivateKey}`);
+    console.log(`[Signature Service] 3. Obtuvimos el privateKey`);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
-    console.log(`[Signature Service] 3. Obtuvimos el pemPrivateKey: ${pemPrivateKey}`);
+    console.log(`[Signature Service] 4. Obtuvimos el pemPrivateKey`);
 
     // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
     const soapBody = `
-        <des:PeticionDescargaMasivaTercerosEntrada xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
+        <des:PeticionDescargaMasivaTercerosEntrada>
             <des:peticionDescarga IdPaquete="${idPaquete}" RfcSolicitante="${rfcSolicitante}">
+                <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+                    <SignedInfo>
+                        <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+                        SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+                        <Reference URI="">
+
             </des:peticionDescarga>
         </des:PeticionDescargaMasivaTercerosEntrada>
     `.trim();
