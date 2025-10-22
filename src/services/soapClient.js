@@ -45,22 +45,15 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
             'Authorization': `WRAP access_token="${authToken}"` // Header de autorización
         };
 
-        console.log(`\n[SOAP Client DEBUG] Respuesta CRUDA del SAT para la acción: ${soapAction}`);
-        console.log('----------------------------------------------------');
-        console.log(data); // <--- ESTA ES LA EVIDENCIA QUE NECESITAMOS
-        console.log('----------------------------------------------------\n');
-
         const { data } = await axios.post(url, xml, { headers });
 
         const parsedData = await parseStringPromise(data, {
             explicitArray: false,
-            tagNameProcessors: [tag => tag.replace('s:', '').replace(/s:|des:|h:/, '')]
+            tagNameProcessors: [tag => tag.replace('s:', '').replace(/s:|des:/, '')]
         });
 
         //console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
         //console.log(JSON.stringify(parsedData, null, 2));
-
-       
         if (!parsedData.Envelope || !parsedData.Envelope.Body) {
             // Si no tiene la estructura, es una respuesta inesperada (probablemente un Fault)
             console.error('[SOAP Client] Respuesta inesperada del SAT:', JSON.stringify(parsedData, null, 2));
