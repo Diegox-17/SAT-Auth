@@ -2,10 +2,29 @@
 
 const forge = require('node-forge');
 
+/**
+ * Extrae datos del certificado de forma segura y robusta.
+ * @param {string} cerBase64 - El contenido del archivo .cer en Base64.
+ * @returns {object} Un objeto con datos del certificado listos para usar en la firma.
+ */
 function processCertificate(cerBase64) {
     const cerDer = forge.util.decode64(cerBase64);
     const cerAsn1 = forge.asn1.fromDer(cerDer);
     const certificate = forge.pki.certificateFromAsn1(cerAsn1);
+
+    // --- LA FORMA CORRECTA Y SEGURA DE OBTENER LOS DATOS DEL EMISOR ---
+    // Iteramos de forma segura, garantizando que no haya 'undefined'.
+    const issuerParts = [];
+    for (const attr of certificate.issuer.attributes) {
+        // Usamos el nombre corto si existe, si no, el nombre largo. Esto cubre todos los casos.
+        const name = attr.shortName || attr.name;
+        if (name) { // ¡La validación crucial!
+            issuerParts.push(`${name}=${attr.value}`);
+        }
+    }
+    // Unimos las partes en el orden inverso, que es el estándar para DN (Distinguished Names).
+    const issuerData = issuerParts.reverse().join(', ');
+    // --- FIN DE LA CORRECCIÓN ---
 
     const certificatePem = forge.pki.certificateToPem(certificate);
     const pureCertBase64 = certificatePem
@@ -14,8 +33,7 @@ function processCertificate(cerBase64) {
         .replace(/\r/g, '')
         .replace(/\n/g, '');
 
-    // VOLVEMOS A LA VERSIÓN SIMPLE: No se calcula issuerData aquí.
-    return { certificate, pureCertBase64 };
+    return { certificate, issuerData, pureCertBase64 };
 }
 
 function decryptPrivateKey(keyPem, password) {
