@@ -15,6 +15,7 @@ app.use(express.static('public')); // Para servir nuestra API-LAB
 app.use('/auth', authRouter);
 app.use('/descarga', descargaRouter); // Descarga
 app.use('/descarga/verificar', verificacionRoutes);
+app.use('/descarga/paquetes', paquetesRoutes);
 app.listen(port, () => {
     console.log(`Servicio SAT escuchando en http://localhost:${port}`);
 });
