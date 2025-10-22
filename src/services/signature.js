@@ -240,7 +240,18 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     sig.signingKey = pemPrivateKey;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     
-    sig.keyInfoProvider = { /* ... (código idéntico al de tus otras funciones) ... */ };
+    sig.keyInfoProvider = { 
+        getKeyInfo: (key, prefix) => {
+            prefix = prefix ? prefix + ':' : '';
+            return `<${prefix}X509Data>
+                        <${prefix}X509IssuerSerial>
+                            <${prefix}X509IssuerName>${issuerData}</${prefix}X509IssuerName>
+                            <${prefix}X509SerialNumber>${certificate.serialNumber}</${prefix}X509SerialNumber>
+                        </${prefix}X509IssuerSerial>
+                        <${prefix}X509Certificate>${pureCertBase64}</${prefix}X509Certificate>
+                    </${prefix}X509Data>`;
+        }
+    };
 
     sig.addReference(
         "//*[local-name(.)='peticionDescarga']", // Firmamos el nodo 'peticionDescarga'
@@ -248,7 +259,13 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
         "http://www.w3.org/2000/09/xmldsig#sha1"
     );
 
-    sig.computeSignature(soapBody, { /* ... (código idéntico al de tus otras funciones) ... */ });
+    sig.computeSignature(soapBody, {
+        prefix: 'xd', // Usamos el mismo prefijo
+        location: {
+            reference: "//*[local-name(.)='solicitud']",
+            action: 'append'
+        }
+    });
 
     const signedBodyXml = sig.getSignedXml();
 
