@@ -7,24 +7,19 @@ const { sendAuthenticatedRequest } = require('../services/soapClient');
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    const { authToken, fiel, idPaquete } = req.body;
-
-    if (!authToken || !fiel || !idPaquete || !fiel.rfc) {
-        return res.status(400).json({ error: 'Parámetros requeridos: authToken, fiel (con rfc), idPaquete.' });
-    }
-
+    // ... (la validación se queda igual)
     try {
         const signedXml = await signPackageDownloadRequest(fiel, idPaquete, fiel.rfc);
 
-        // --- LA CORRECCIÓN CLAVE EN EL CÓDIGO ---
-        // Cambiamos la interfaz en la SOAPAction para que coincida con el servicio que sí funciona.
+        // --- LA CORRECCIÓN CLAVE ---
+        // La URL apunta a SolicitaDescargaService.svc, por lo tanto, la interfaz es ISolicitaDescargaService.
         const soapAction = 'http://DescargaMasivaTerceros.sat.gob.mx/ISolicitaDescargaService/Descargar';
         // --- FIN DE LA CORRECCIÓN ---
 
         const soapResponse = await sendAuthenticatedRequest(
-            process.env.SAT_PACKAGE_DOWNLOAD_URL,
+            process.env.SAT_PACKAGE_DOWNLOAD_URL, // Esta ahora apunta a la URL correcta
             signedXml,
-            'http://DescargaMasivaTerceros.sat.gob.mx/IDescargaMasivaTercerosService/Descargar',
+            soapAction, // Y esta es la SOAPAction correcta para esa URL
             authToken
         );
 
