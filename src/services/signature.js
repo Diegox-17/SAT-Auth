@@ -227,6 +227,7 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     const privateKey = decryptPrivateKey(keyPem, password);
     console.log(`[Signature Service] 3. Obtuvimos el privateKey: ${decryptPrivateKey}`);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+    console.log(`[Signature Service] 3. Obtuvimos el pemPrivateKey: ${pemPrivateKey}`);
 
     // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
     const soapBody = `
