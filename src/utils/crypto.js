@@ -8,22 +8,17 @@ const forge = require('node-forge');
  * @returns {object} Un objeto con datos del certificado listos para usar en la firma.
  */
 function processCertificate(cerBase64) {
+    // AÑADIMOS UN LOG PARA VERIFICAR QUE EL CÓDIGO NUEVO ESTÁ CORRIENDO
+    console.log('[Crypto.js] Ejecutando la versión final y correcta de processCertificate...');
+
     const cerDer = forge.util.decode64(cerBase64);
     const cerAsn1 = forge.asn1.fromDer(cerDer);
     const certificate = forge.pki.certificateFromAsn1(cerAsn1);
 
-    // --- LA FORMA CORRECTA Y SEGURA DE OBTENER LOS DATOS DEL EMISOR ---
-    // Iteramos de forma segura, garantizando que no haya 'undefined'.
-    const issuerParts = [];
-    for (const attr of certificate.issuer.attributes) {
-        // Usamos el nombre corto si existe, si no, el nombre largo. Esto cubre todos los casos.
-        const name = attr.shortName || attr.name;
-        if (name) { // ¡La validación crucial!
-            issuerParts.push(`${name}=${attr.value}`);
-        }
-    }
-    // Unimos las partes en el orden inverso, que es el estándar para DN (Distinguished Names).
-    const issuerData = issuerParts.reverse().join(', ');
+    // --- LA FORMA CANÓNICA Y SEGURA DE OBTENER LOS DATOS DEL EMISOR ---
+    // Usamos el método .toString() que la librería provee para esto.
+    // Esto genera una cadena de Distinguished Name (DN) formateada correctamente.
+    const issuerData = certificate.issuer.toString();
     // --- FIN DE LA CORRECCIÓN ---
 
     const certificatePem = forge.pki.certificateToPem(certificate);
@@ -33,6 +28,7 @@ function processCertificate(cerBase64) {
         .replace(/\r/g, '')
         .replace(/\n/g, '');
 
+    console.log(`[Crypto.js] IssuerData generado: ${issuerData}`); // LOG DE VERIFICACIÓN
     return { certificate, issuerData, pureCertBase64 };
 }
 
