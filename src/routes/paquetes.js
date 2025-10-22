@@ -6,7 +6,6 @@ const { sendAuthenticatedRequest } = require('../services/soapClient');
 
 const router = express.Router();
 
-// El endpoint será POST / ya que lo montaremos en /descarga/paquetes
 router.post('/', async (req, res) => {
     const { authToken, fiel, idPaquete } = req.body;
 
@@ -15,10 +14,8 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        // 1. Firmar la petición de descarga
         const signedXml = await signPackageDownloadRequest(fiel, idPaquete, fiel.rfc);
 
-        // 2. Enviar la petición SOAP al SAT
         const soapResponse = await sendAuthenticatedRequest(
             process.env.SAT_PACKAGE_DOWNLOAD_URL,
             signedXml,
@@ -30,16 +27,31 @@ router.post('/', async (req, res) => {
             return res.status(soapResponse.error.statusCode || 500).json({ error: 'Error del SAT al solicitar descarga', details: soapResponse.error.message });
         }
 
-        // 3. Extraer el paquete en Base64 de la respuesta
-        const packageBase64 = soapResponse.data.RespuestaDescargaMasivaTercerosSalida.Paquete;
+        // --- LÓGICA FINAL Y CORRECTA ---
+        // 1. Extraemos el header y el body del sobre
+        const header = soapResponse.data.Header;
+        const body = soapResponse.data.Body;
+
+        // 2. Revisamos el estado en el header
+        const status = header.respuesta.$; // Los atributos están en el objeto '$'
+        console.log('[Route Paquetes] Respuesta del Header del SAT:', status);
+
+        if (status.CodEstatus !== '5000') {
+            // Si el código no es 5000, es un error. Devolvemos el mensaje del header.
+            return res.status(400).json({
+                error: 'El SAT rechazó la descarga del paquete.',
+                details: `Código: ${status.CodEstatus} - Mensaje: ${status.Mensaje}`
+            });
+        }
+        
+        // 3. Si el estado es 5000, procedemos a extraer el paquete del body
+        const packageBase64 = body.RespuestaDescargaMasivaTercerosSalida.Paquete;
         if (!packageBase64) {
-            return res.status(404).json({ error: 'El SAT no devolvió un paquete en su respuesta.' });
+            return res.status(404).json({ error: 'El SAT reportó éxito (5000) pero no devolvió un paquete.' });
         }
 
-        // 4. Convertir de Base64 a un buffer binario
         const packageBuffer = Buffer.from(packageBase64, 'base64');
         
-        // 5. Enviar el archivo .zip al cliente (n8n)
         res.setHeader('Content-Disposition', `attachment; filename="${idPaquete}.zip"`);
         res.setHeader('Content-Type', 'application/zip');
         res.send(packageBuffer);
