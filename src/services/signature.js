@@ -13,7 +13,7 @@ const { processCertificate, decryptPrivateKey } = require('../utils/crypto');
 function createAuthSignature(cerBase64, keyPem, password) {
     // ... tu código de autenticación existente y funcional va aquí ...
     // No es necesario pegarlo todo, solo asegúrate de que se quede como está.
-    console.log('[SIGNATURE] v10.0 - Sintaxis final para xml-crypto@2.1.3');
+    //console.log('[SIGNATURE] v10.0 - Sintaxis final para xml-crypto@2.1.3');
 
     const { pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
