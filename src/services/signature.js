@@ -223,10 +223,7 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     const { cerBase64, keyPem, password } = fiel;
     console.log(`[Signature Service] 1. Hemos leido la FIEL`);
     const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
-    console.log(`[Signature Service] 2. Tenemos la siguiente info`);
-    console.log(`[Signature Service] 2.1 Certificado:` ${certificate} );
-    console.log(`[Signature Service] 2.2 issuerData:` ${issuerData} );
-    console.log(`[Signature Service] 2.3 pureCertBase64:` ${pureCertBase64} );
+    console.log(`[Signature Service] 2. Hemos leido el certificate, issuerData y pureCertBase64 para generar el cerBase64`);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
