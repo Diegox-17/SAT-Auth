@@ -55,28 +55,20 @@ async function sendAuthenticatedRequest(url, xml, soapAction, authToken) {
         //console.log('[SOAP Client] Respuesta COMPLETA del SAT (parseada a JSON):');
         //console.log(JSON.stringify(parsedData, null, 2));
 
-        // --- LA CORRECCIÓN CLAVE ---
-        // Devolvemos el sobre COMPLETO para poder acceder al Header y al Body
-        if (!parsedData.Envelope) {
-            throw new Error("La respuesta del SAT no es un sobre SOAP válido.");
-        }
-        
-        console.log('[SOAP Client] Sobre SOAP completo recibido y parseado.');
-        return { success: true, data: parsedData.Envelope };
-        
-        //if (!parsedData.Envelope || !parsedData.Envelope.Body) {
+       
+        if (!parsedData.Envelope || !parsedData.Envelope.Body) {
             // Si no tiene la estructura, es una respuesta inesperada (probablemente un Fault)
-        //    console.error('[SOAP Client] Respuesta inesperada del SAT:', JSON.stringify(parsedData, null, 2));
-        //    const faultMessage = parsedData.Fault?.faultstring || 'La respuesta del SAT no es un sobre SOAP válido.';
-        //    return { success: false, error: { statusCode: 500, message: faultMessage }};
-        //}
+            console.error('[SOAP Client] Respuesta inesperada del SAT:', JSON.stringify(parsedData, null, 2));
+            const faultMessage = parsedData.Fault?.faultstring || 'La respuesta del SAT no es un sobre SOAP válido.';
+            return { success: false, error: { statusCode: 500, message: faultMessage }};
+        }
         // --- FIN DE LA CORRECCIÓN ---
         
-        //const body = parsedData.Envelope.Body;
+        const body = parsedData.Envelope.Body;
         
-        //console.log('[SOAP Client] Cuerpo de la respuesta del SAT (parseado):', JSON.stringify(body, null, 2));
+        console.log('[SOAP Client] Cuerpo de la respuesta del SAT (parseado):', JSON.stringify(body, null, 2));
 
-        //return { success: true, data: body };
+        return { success: true, data: body };
 
     } 
     
