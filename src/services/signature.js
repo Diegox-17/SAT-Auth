@@ -225,6 +225,7 @@ async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
     const { certificate, issuerData, pureCertBase64 } = processCertificate(cerBase64);
     console.log(`[Signature Service] 2. Hemos leido el certificate, issuerData y pureCertBase64 para generar el cerBase64`);
     const privateKey = decryptPrivateKey(keyPem, password);
+    console.log(`[Signature Service] 3. Obtuvimos el privateKey: ${decryptPrivateKey}`);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
     // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
