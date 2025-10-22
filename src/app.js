@@ -2,6 +2,7 @@ const express = require('express');
 const authRouter = require('./routes/auth');
 const descargaRouter = require('./routes/descarga'); // Descarga
 const verificacionRoutes = require('./routes/verificacion');
+const paquetesRoutes = require('./routes/paquetes');
 
 const app = express();
 const port = 3000;
