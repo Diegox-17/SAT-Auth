@@ -71,40 +71,29 @@ function createAuthSignature(cerBase64, keyPem, password) {
 
 //Función de descargas:
 async function generateDownloadSignature(fiel, requestData, type) {
-    console.log(`[Signature Service] Iniciando generación de firma para descarga de tipo: ${type}`);
+    console.log(`[Signature Service vFINAL] Iniciando firma de SOLICITUD tipo: ${type}`);
     if (!fiel || !fiel.cerBase64 || !fiel.keyPem || !fiel.password) {
         throw new Error("El objeto 'fiel' y sus propiedades son requeridos.");
     }
 
     // 1. Conservamos toda tu lógica inicial de preparación
     const { cerBase64, keyPem, password } = fiel;
-    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
+    const { pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
 
-    // Construimos issuerData aquí dentro, de forma segura
-    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
-
-    const attributesString = Object.keys(requestData).sort()
-        .map(key => `${key}="${requestData[key]}"`)
-        .join(' ');
-    
-    // --- LA CORRECCIÓN ESTRUCTURAL ---
-    // 2. Creamos solo el CUERPO del XML que será firmado (sin el sobre <s:Envelope>)
     const serviceNode = `des:SolicitaDescarga${type}`;
-    const soapBody = `
-        <${serviceNode} xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <des:solicitud ${attributesString}>
-            </des:solicitud>
-        </${serviceNode}>
-    `.trim();
+    const attributesString = Object.keys(requestData).sort().map(key => `${key}="${requestData[key]}"`).join(' ');
+    const soapBody = `<${serviceNode} xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx"><des:solicitud ${attributesString}></des:solicitud></${serviceNode}>`.trim();
 
     // 3. La configuración de la firma es idéntica
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
-    sig.keyInfoProvider = { 
-        getKeyInfo: () => `<X509Data><X509IssuerSerial><X509IssuerName>${issuerData}</X509IssuerName><X509SerialNumber>${certificate.serialNumber}</X509SerialNumber></X509IssuerSerial><X509Certificate>${pureCertBase64}</X509Certificate></X509Data>` };
-
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    sig.keyInfoProvider = {
+        getKeyInfo: () => `<X509Data><X509Certificate>${pureCertBase64}</X509Certificate></X509Data>`
+    };
+    
     sig.addReference(
         "//*[local-name(.)='solicitud']",
         ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
@@ -137,134 +126,72 @@ async function generateDownloadSignature(fiel, requestData, type) {
     return finalXml;
 }
 
+// --- FUNCIÓN DE VERIFICACIÓN - ALINEADA CON LA DE SOLICITUD ---
 async function signVerificationRequest(fiel, idSolicitud, rfcSolicitante) {
-    console.log(`[Signature Service] Iniciando firma para Verificación de Solicitud`);
+    console.log(`[Signature Service vFINAL] Iniciando firma de VERIFICACIÓN`);
     const { cerBase64, keyPem, password } = fiel;
-    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
+    const { pureCertBase64 } = processCertificate(cerBase64);
     const privateKey = decryptPrivateKey(keyPem, password);
     const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+
+    const soapBody = `<des:VerificaSolicitudDescarga xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx"><des:solicitud IdSolicitud="${idSolicitud}" RfcSolicitante="${rfcSolicitante}"></des:solicitud></des:VerificaSolicitudDescarga>`.trim();
     
-    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
-
-    // 2. Construimos el cuerpo SOAP específico para la verificación
-    const soapBody = `
-        <des:VerificaSolicitudDescarga xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <des:solicitud IdSolicitud="${idSolicitud}" RfcSolicitante="${rfcSolicitante}">
-            </des:solicitud>
-        </des:VerificaSolicitudDescarga>
-    `.trim();
-
-    // 3. Clonamos la configuración de firma de generateDownloadSignature
-    const sig = new SignedXml();
-    sig.signingKey = pemPrivateKey;
-    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"; // Algoritmo explícito
-    
-    // KeyInfoProvider idéntico
-    sig.keyInfoProvider = {
-        getKeyInfo: (key, prefix) => {
-            prefix = prefix ? prefix + ':' : '';
-            return `<${prefix}X509Data>
-                        <${prefix}X509IssuerSerial>
-                            <${prefix}X509IssuerName>${issuerData}</${prefix}X509IssuerName>
-                            <${prefix}X509SerialNumber>${certificate.serialNumber}</${prefix}X509SerialNumber>
-                        </${prefix}X509IssuerSerial>
-                        <${prefix}X509Certificate>${pureCertBase64}</${prefix}X509Certificate>
-                    </${prefix}X509Data>`;
-        }
-    };
-
-    // Referencia y Transforms idénticos
-    sig.addReference(
-        "//*[local-name(.)='solicitud']",
-        [
-            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
-            "http://www.w3.org/2001/10/xml-exc-c14n#"
-        ],
-        "http://www.w3.org/2000/09/xmldsig#sha1" // Digest idéntico
-    );
-
-    // 4. Calculamos la firma sobre el cuerpo del XML
-    sig.computeSignature(soapBody, {
-        prefix: 'xd', // Usamos el mismo prefijo
-        location: {
-            reference: "//*[local-name(.)='solicitud']",
-            action: 'append'
-        }
-    });
-
-    const signedBodyXml = sig.getSignedXml();
-
-    // 5. Envolvemos el cuerpo firmado en el sobre final
-    const finalXml = `
-        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-            <s:Header/>
-            <s:Body>
-                ${signedBodyXml}
-            </s:Body>
-        </s:Envelope>
-    `.trim();
-
-    console.log('[Signature Service] Firma de Verificación generada exitosamente.');
-    return finalXml;
-}
-
-//función para la descarga de paquetes
-async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
-    console.log(`[Signature Service] Iniciando firma para descarga del paquete: ${idPaquete}`);
-    const { cerBase64, keyPem, password } = fiel;
-    const { certificate, pureCertBase64 } = processCertificate(cerBase64);
-    const privateKey = decryptPrivateKey(keyPem, password);
-    const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);    
-    const issuerData = certificate.issuer.attributes.map(attr => `${attr.shortName}=${attr.value}`).join(', ');
-
-    // 1. Construimos el cuerpo SOAP específico para la descarga de paquetes
-    const soapBody = `
-        <des:PeticionDescargaMasivaTercerosEntrada xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx">
-            <des:peticionDescarga IdPaquete="${idPaquete}" RfcSolicitante="${rfcSolicitante}">
-            </des:peticionDescarga>
-        </des:PeticionDescargaMasivaTercerosEntrada>
-    `.trim();
-
-    // 2. La configuración de la firma es idéntica a las otras que ya funcionan
     const sig = new SignedXml();
     sig.signingKey = pemPrivateKey;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    
-    // KeyInfoProvider idéntico
     sig.keyInfoProvider = {
-        getKeyInfo: (key, prefix) => {
-            prefix = prefix ? prefix + ':' : '';
-            return `<${prefix}X509Data>
-                        <${prefix}X509IssuerSerial>
-                            <${prefix}X509IssuerName>${issuerData}</${prefix}X509IssuerName>
-                            <${prefix}X509SerialNumber>${certificate.serialNumber}</${prefix}X509SerialNumber>
-                        </${prefix}X509IssuerSerial>
-                        <${prefix}X509Certificate>${pureCertBase64}</${prefix}X509Certificate>
-                    </${prefix}X509Data>`;
-        }
-    };
-
-    sig.addReference(
-        "//*[local-name(.)='peticionDescarga']", // Firmamos el nodo 'peticionDescarga'
-        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"],
-        "http://www.w3.org/2000/09/xmldsig#sha1"
-    );
-
-    // 4. Calculamos la firma sobre el cuerpo del XML
-    sig.computeSignature(soapBody, {
-        prefix: 'xd', // Usamos el mismo prefijo
-        location: {
-            reference: "//*[local-name(.)='peticionDescarga']",
-            action: 'append'
-        }
+        getKeyInfo: () => 
+            `<X509Data>
+                <X509Certificate>${pureCertBase64}</X509Certificate>
+            </X509Data>` };
+    sig.addReference("//*[local-name(.)='solicitud']", 
+        ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", 
+        "http://www.w3.org/2001/10/xml-exc-c14n#"], 
+                    "http://www.w3.org/2000/09/xmldsig#sha1");
+    sig.computeSignature(soapBody, { 
+        prefix: 'xd', location: { 
+            reference: "//*[local-name(.)='solicitud']", action: 'append' 
+        } 
     });
+
+    const signedBodyXml = sig.getSignedXml();
+    const finalXml = 
+        `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            <s:Header/>
+            <s:Body>${signedBodyXml}</s:Body>
+        </s:Envelope>`;
+    return finalXml;
+}
+
+// --- FUNCIÓN DE DESCARGA DE PAQUETES - ALINEADA CON LA DE SOLICITUD ---
+async function signPackageDownloadRequest(fiel, idPaquete, rfcSolicitante) {
+    console.log(`[Signature Service vFINAL] Iniciando firma de DESCARGA DE PAQUETE`);
+    const { cerBase64, keyPem, password } = fiel;
+    const { pureCertBase64 } = processCertificate(cerBase64);
+    const privateKey = decryptPrivateKey(keyPem, password);
+    const pemPrivateKey = forge.pki.privateKeyToPem(privateKey);
+
+    const soapBody = `<des:PeticionDescargaMasivaTercerosEntrada xmlns:des="http://DescargaMasivaTerceros.sat.gob.mx"><des:peticionDescarga IdPaquete="${idPaquete}" RfcSolicitante="${rfcSolicitante}"></des:peticionDescarga></des:PeticionDescargaMasivaTercerosEntrada>`.trim();
+
+    const sig = new SignedXml();
+    sig.signingKey = pemPrivateKey;
+    sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
+    sig.keyInfoProvider = { getKeyInfo: () => 
+        `<X509Data>
+            <X509Certificate>${pureCertBase64}</X509Certificate>
+        </X509Data>` };
+    sig.addReference("//*[local-name(.)='peticionDescarga']", 
+            ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", 
+            "http://www.w3.org/2001/10/xml-exc-c14n#"], 
+            "http://www.w3.org/2000/09/xmldsig#sha1");
+    sig.computeSignature(soapBody, { prefix: 'xd', location: { reference: "//*[local-name(.)='peticionDescarga']", action: 'append' } });
     
     const signedBodyXml = sig.getSignedXml();
-
-    // 3. Envolvemos en el sobre final
-    const finalXml = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Header/><s:Body>${signedBodyXml}</s:Body></s:Envelope>`;
-
-    console.log('[Signature Service] Firma de descarga de paquete generada exitosamente.');
+    const finalXml = 
+        `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+            <s:Header/>
+            <s:Body>${signedBodyXml}</s:Body>
+        </s:Envelope>`;
     return finalXml;
 }
 
